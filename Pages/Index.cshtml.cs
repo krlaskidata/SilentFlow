@@ -1,5 +1,7 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
+public static class DownloadState
+{
+    public static int Progress = 0;
+}
 
 public class IndexModel : PageModel
 {
@@ -17,30 +19,29 @@ public class IndexModel : PageModel
     public string Format { get; set; }
 
     public string Result { get; set; }
-
-    // ✅ DAS IST DER FIX
     public string Error { get; set; }
 
-    public void OnGet() { }
-
-    public void OnPost()
+    public async Task<IActionResult> OnPostAsync()
     {
-        Error = null;
-        Result = null;
-
         if (string.IsNullOrWhiteSpace(Url))
         {
-            Error = "❌ Bitte URL eingeben!";
-            return;
+            Error = "Bitte URL eingeben!";
+            return Page();
         }
 
-        try
+        DownloadState.Progress = 0;
+
+        await _service.RunDownloadAsync(Url, Format, p =>
         {
-            Result = _service.RunDownload(Url, Format);
-        }
-        catch (Exception ex)
-        {
-            Error = "❌ Fehler: " + ex.Message;
-        }
+            DownloadState.Progress = p;
+        });
+
+        Result = "✅ Download fertig!";
+        return Page();
+    }
+
+    public JsonResult OnGetProgress()
+    {
+        return new JsonResult(DownloadState.Progress);
     }
 }

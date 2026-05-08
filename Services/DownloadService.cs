@@ -2,55 +2,41 @@ using System.Diagnostics;
 
 public class DownloadService
 {
-    public string RunDownload(string url, string format)
+    public async Task RunDownloadAsync(string url, string format, Action<int> onProgress)
     {
-        try
+        string downloadPath = "downloads";
+        Directory.CreateDirectory(downloadPath);
+
+        string args = format == "mp3"
+            ? $"--no-check-certificate --force-ipv4 -x --audio-format mp3 --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\""
+            : $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\"";
+
+        var process = new Process();
+        process.StartInfo.FileName = "yt-dlp.exe";
+        process.StartInfo.Arguments = args;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
+
+        process.Start();
+
+        while (!process.StandardOutput.EndOfStream)
         {
-            string downloadPath = "downloads";
-            Directory.CreateDirectory(downloadPath);
+            var line = await process.StandardOutput.ReadLineAsync();
 
-            string args;
-
-            if (format == "mp3")
+            if (line != null && line.Contains("%"))
             {
-                // ✅ Audio extrahieren + SSL Fix + stabil
-                args = $"--no-check-certificate --force-ipv4 -x --audio-format mp3 " +
-                       $"-o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\"";
+                // Beispiel: [download]  47.2% of ...
+                var percentText = line.Split('%')[0];
+                var numbers = new string(percentText.Where(char.IsDigit).ToArray());
+
+                if (int.TryParse(numbers, out int percent))
+                {
+                    onProgress(percent);
+                }
             }
-            else
-            {
-                // ✅ Bestes Video + Audio + SSL Fix
-                args = $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" " +
-                       $"-o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\"";
-            }
-
-            var process = new Process();
-            process.StartInfo.FileName = "yt-dlp.exe";
-            process.StartInfo.Arguments = args;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.CreateNoWindow = true;
-
-            process.Start();
-
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-
-            process.WaitForExit();
-
-            // ✅ Echte Fehler anzeigen
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                return "❌ Fehler:\n" + error;
-            }
-
-            // ✅ Erfolgsnachricht
-            return "✅ Download fertig! → Schau im Ordner /downloads";
         }
-        catch (Exception ex)
-        {
-            return "❌ Exception: " + ex.Message;
-        }
+
+        await process.WaitForExitAsync();
     }
 }
