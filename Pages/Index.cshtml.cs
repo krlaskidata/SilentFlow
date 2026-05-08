@@ -18,16 +18,29 @@ public class IndexModel : PageModel
 
     public string Result { get; set; }
 
+    // ✅ DAS IST DER FIX
+    public string Error { get; set; }
+
     public void OnGet() { }
 
     public void OnPost()
     {
+        Error = null;
+        Result = null;
+
         if (string.IsNullOrWhiteSpace(Url))
         {
-            Result = "❌ Bitte URL eingeben!";
+            Error = "❌ Bitte URL eingeben!";
             return;
         }
 
-        Result = _service.RunDownload(Url, Format);
+        try
+        {
+            Result = _service.RunDownload(Url, Format);
+        }
+        catch (Exception ex)
+        {
+            Error = "❌ Fehler: " + ex.Message;
+        }
     }
 }
