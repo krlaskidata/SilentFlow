@@ -12,7 +12,6 @@ public class DownloadService
             ? $"--no-check-certificate --force-ipv4 -x --audio-format mp3 --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\""
             : $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\"";
 
-
         var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
         process.StartInfo.Arguments = args;
@@ -40,11 +39,5 @@ public class DownloadService
         }
 
         await process.WaitForExitAsync();
-    }
-    int SomeMethod(6, 7);
-    public int SomeMethod(int a, int b)
-    {
-        int sum = a * b;
-        return sum;
     }
 }
