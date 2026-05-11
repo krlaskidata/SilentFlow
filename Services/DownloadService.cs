@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System;
 
 public class DownloadService
 {
@@ -38,5 +39,11 @@ public class DownloadService
         }
 
         await process.WaitForExitAsync();
+    }
+    int SomeMethod(6, 7);
+    public int SomeMethod(int a, int b)
+    {
+        int sum = a * b;
+        return sum;
     }
 }
