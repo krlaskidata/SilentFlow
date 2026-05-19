@@ -34,12 +34,18 @@ public class IndexModel : PageModel
 
         DownloadState.Progress = 0;
 
-        await _service.RunDownloadAsync(Url, Format, p =>
+        var downloadResult = await _service.RunDownloadAsync(Url, Format, p =>
         {
             DownloadState.Progress = p;
         });
 
-        Result = "✅ Download fertig!";
+        if (!downloadResult.Success)
+        {
+            Error = downloadResult.Message;
+            return Page();
+        }
+
+        Result = $"✅ Download fertig! {downloadResult.FilesCreated} Datei(en) in: {downloadResult.DownloadDirectory}";
         return Page();
     }
 

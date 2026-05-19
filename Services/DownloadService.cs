@@ -1,43 +1,113 @@
 using System.Diagnostics;
 using System;
+using System.Text.RegularExpressions;
 
 public class DownloadService
 {
-    public async Task RunDownloadAsync(string url, string format, Action<int> onProgress)
+    private readonly IWebHostEnvironment _environment;
+    private static readonly Regex ProgressRegex = new(@"\[download\]\s+(\d{1,3}(?:\.\d+)?)%", RegexOptions.Compiled);
+
+    public DownloadService(IWebHostEnvironment environment)
     {
-        string downloadPath = "downloads";
+        _environment = environment;
+    }
+
+    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Action<int> onProgress)
+    {
+        string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
 
+        var filesBefore = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        string outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
+
         string args = format == "mp3"
-            ? $"--no-check-certificate --force-ipv4 -x --audio-format mp3 --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\""
-            : $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" --newline -o \"{downloadPath}/%(title)s.%(ext)s\" \"{url}\"";
+            ? $"--no-check-certificate --force-ipv4 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
+            : $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
+
+        var outputLines = new List<string>();
+        var sync = new object();
 
         var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
         process.StartInfo.Arguments = args;
         process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
         process.StartInfo.UseShellExecute = false;
         process.StartInfo.CreateNoWindow = true;
+        process.StartInfo.WorkingDirectory = _environment.ContentRootPath;
 
-        process.Start();
-
-        while (!process.StandardOutput.EndOfStream)
+        if (!process.Start())
         {
-            var line = await process.StandardOutput.ReadLineAsync();
+            return DownloadResult.Failed("yt-dlp konnte nicht gestartet werden.");
+        }
 
-            if (line != null && line.Contains("%"))
+        async Task ConsumeStreamAsync(StreamReader reader)
+        {
+            while (true)
             {
-                // Beispiel: [download]  47.2% of ...
-                var percentText = line.Split('%')[0];
-                var numbers = new string(percentText.Where(char.IsDigit).ToArray());
-
-                if (int.TryParse(numbers, out int percent))
+                var line = await reader.ReadLineAsync();
+                if (line is null)
                 {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                lock (sync)
+                {
+                    outputLines.Add(line);
+                }
+
+                var match = ProgressRegex.Match(line);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                if (double.TryParse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var percentRaw))
+                {
+                    var percent = (int)Math.Clamp(Math.Round(percentRaw), 0, 100);
                     onProgress(percent);
                 }
             }
         }
 
+        await Task.WhenAll(
+            ConsumeStreamAsync(process.StandardOutput),
+            ConsumeStreamAsync(process.StandardError));
+
         await process.WaitForExitAsync();
+
+        var filesAfter = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var newFilesCount = filesAfter.Except(filesBefore).Count();
+
+        if (process.ExitCode != 0)
+        {
+            var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
+            return DownloadResult.Failed($"yt-dlp Fehler (ExitCode {process.ExitCode}).{Environment.NewLine}{message}");
+        }
+
+        if (newFilesCount == 0)
+        {
+            var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
+            return DownloadResult.Failed($"Kein Download gespeichert. Zielordner: {downloadPath}{Environment.NewLine}{message}");
+        }
+
+        onProgress(100);
+        return DownloadResult.Succeeded(downloadPath, newFilesCount);
     }
 }
+
+public record DownloadResult(bool Success, string Message, string DownloadDirectory, int FilesCreated)
+{
+    public static DownloadResult Succeeded(string downloadDirectory, int filesCreated) =>
+        new(true, string.Empty, downloadDirectory, filesCreated);
+
+    public static DownloadResult Failed(string message) =>
+        new(false, message, string.Empty, 0);
+}
+
