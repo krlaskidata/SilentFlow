@@ -45,7 +45,9 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        Result = $"✅ Download fertig! {downloadResult.FilesCreated} Datei(en) in: {downloadResult.DownloadDirectory}";
+        Result = downloadResult.AlreadyExisted
+            ? $"✅ Bereits vorhanden im Ordner: {downloadResult.DownloadDirectory}"
+            : $"✅ Download fertig! {downloadResult.FilesCreated} Datei(en) in: {downloadResult.DownloadDirectory}";
         return Page();
     }
 

@@ -84,11 +84,18 @@ public class DownloadService
 
         var filesAfter = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var newFilesCount = filesAfter.Except(filesBefore).Count();
+        var alreadyDownloaded = outputLines.Any(l => l.Contains("already been downloaded", StringComparison.OrdinalIgnoreCase));
 
         if (process.ExitCode != 0)
         {
             var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
             return DownloadResult.Failed($"yt-dlp Fehler (ExitCode {process.ExitCode}).{Environment.NewLine}{message}");
+        }
+
+        if (alreadyDownloaded)
+        {
+            onProgress(100);
+            return DownloadResult.Succeeded(downloadPath, 0, true);
         }
 
         if (newFilesCount == 0)
@@ -98,16 +105,16 @@ public class DownloadService
         }
 
         onProgress(100);
-        return DownloadResult.Succeeded(downloadPath, newFilesCount);
+        return DownloadResult.Succeeded(downloadPath, newFilesCount, false);
     }
 }
 
-public record DownloadResult(bool Success, string Message, string DownloadDirectory, int FilesCreated)
+public record DownloadResult(bool Success, string Message, string DownloadDirectory, int FilesCreated, bool AlreadyExisted)
 {
-    public static DownloadResult Succeeded(string downloadDirectory, int filesCreated) =>
-        new(true, string.Empty, downloadDirectory, filesCreated);
+    public static DownloadResult Succeeded(string downloadDirectory, int filesCreated, bool alreadyExisted) =>
+        new(true, string.Empty, downloadDirectory, filesCreated, alreadyExisted);
 
     public static DownloadResult Failed(string message) =>
-        new(false, message, string.Empty, 0);
+        new(false, message, string.Empty, 0, false);
 }
 
