@@ -89,6 +89,38 @@ button {
     margin-top: 15px;
     color: #ef4444;
 }
+
+/* ✅ SPOTIFY BADGE */
+.spotify-badge {
+    margin-top: 6px;
+    color: #1db954;
+    font-size: 13px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* ✅ PLAYER */
+.player {
+    margin-top: 20px;
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+}
+
+.player-cover {
+    width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.player-media {
+    width: 100%;
+    margin-top: 8px;
+    border-radius: 6px;
+}
 </style>
 
 <script>
@@ -109,6 +141,26 @@ function startProgress() {
         }
     }, 500);
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+    const urlInput = document.getElementById("Url");
+    const formatSelect = document.getElementById("formatSelect");
+    const spotifyBadge = document.getElementById("spotifyBadge");
+
+    urlInput.addEventListener("input", function () {
+        const isSpotify = this.value.toLowerCase().includes("spotify.com");
+        if (isSpotify) {
+            formatSelect.value = "mp3";
+            formatSelect.style.opacity = "0.5";
+            formatSelect.style.pointerEvents = "none";
+            spotifyBadge.style.display = "block";
+        } else {
+            formatSelect.style.opacity = "1";
+            formatSelect.style.pointerEvents = "auto";
+            spotifyBadge.style.display = "none";
+        }
+    });
+});
 </script>
 
 </head>
@@ -128,10 +180,13 @@ function startProgress() {
     <form method="post" onsubmit="startProgress()">
         <input asp-for="Url" placeholder="Video URL einfügen..." />
 
-        <select asp-for="Format">
+        <select id="formatSelect" asp-for="Format">
             <option value="mp4">MP4</option>
             <option value="mp3">MP3</option>
         </select>
+        <div id="spotifyBadge" class="spotify-badge" style="display:none;">
+            🎵 Spotify erkannt – nur MP3 verfügbar
+        </div>
 
         <button type="submit">Convert</button>
     </form>
@@ -149,6 +204,28 @@ function startProgress() {
     @if (!string.IsNullOrEmpty(Model.Error))
     {
         <div class="error">@Model.Error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.MediaFileName))
+    {
+        <div class="player">
+            @if (!string.IsNullOrEmpty(Model.ThumbnailFileName))
+            {
+                <img class="player-cover" src="?handler=File&name=@Uri.EscapeDataString(Model.ThumbnailFileName)" alt="Cover" />
+            }
+            @{
+                var ext = System.IO.Path.GetExtension(Model.MediaFileName ?? "").ToLowerInvariant();
+                bool isVideo = ext == ".mp4" || ext == ".webm" || ext == ".mkv";
+            }
+            @if (isVideo)
+            {
+                <video controls class="player-media" src="?handler=File&name=@Uri.EscapeDataString(Model.MediaFileName)"></video>
+            }
+            else
+            {
+                <audio controls class="player-media" src="?handler=File&name=@Uri.EscapeDataString(Model.MediaFileName)"></audio>
+            }
+        </div>
     }
 
 </div>
