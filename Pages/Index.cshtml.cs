@@ -43,9 +43,17 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (Url.Length > 2048)
+        {
+            Error = "URL zu lang.";
+            return Page();
+        }
+
+        var safeFormat = (Format == "mp3" || Format == "mp4") ? Format : "mp4";
+
         DownloadState.Progress = 0;
 
-        var downloadResult = await _service.RunDownloadAsync(Url, Format ?? "mp4", p =>
+        var downloadResult = await _service.RunDownloadAsync(Url, safeFormat, p =>
         {
             DownloadState.Progress = p;
         });
@@ -60,8 +68,8 @@ public class IndexModel : PageModel
         MediaFileName = downloadResult.MediaPath != null ? Path.GetFileName(downloadResult.MediaPath) : null;
 
         Result = downloadResult.AlreadyExisted
-            ? $"✅ Bereits vorhanden im Ordner: {downloadResult.DownloadDirectory}"
-            : $"✅ Download fertig! {downloadResult.FilesCreated} Datei(en) in: {downloadResult.DownloadDirectory}";
+            ? "✅ Bereits vorhanden – Datei ist fertig!"
+            : $"✅ Download fertig! {downloadResult.FilesCreated} Datei(en) gespeichert.";
         return Page();
     }
 
