@@ -12,7 +12,7 @@ public class DownloadService
         _environment = environment;
     }
 
-    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Action<int> onProgress)
+    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress)
     {
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
@@ -71,7 +71,7 @@ public class DownloadService
                 if (double.TryParse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var percentRaw))
                 {
                     var percent = (int)Math.Clamp(Math.Round(percentRaw), 0, 100);
-                    onProgress(percent);
+                    await onProgress(percent);
                 }
             }
         }
@@ -94,17 +94,17 @@ public class DownloadService
 
         if (alreadyDownloaded)
         {
-            onProgress(100);
+            await onProgress(100);
             return DownloadResult.Succeeded(downloadPath, 0, true);
         }
 
         if (newFilesCount == 0)
         {
             var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
-            return DownloadResult.Failed($"Kein Download gespeichert. Zielordner: {downloadPath}{Environment.NewLine}{message}");
+            return DownloadResult.Failed($"Kein Download gespeichert.{Environment.NewLine}{message}");
         }
 
-        onProgress(100);
+        await onProgress(100);
         return DownloadResult.Succeeded(downloadPath, newFilesCount, false);
     }
 }
