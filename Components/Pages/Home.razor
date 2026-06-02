@@ -1,0 +1,87 @@
+@page "/"
+@rendermode InteractiveServer
+@inject DownloadService DownloadService
+
+<PageTitle>SilentFlow</PageTitle>
+
+<div class="main">
+    <div class="container">
+
+        <form @onsubmit="StartDownload" @onsubmit:preventDefault="true">
+            <input @bind="url" @bind:event="oninput" placeholder="Video URL einfügen..." />
+
+            <select @bind="format">
+                <option value="mp4">MP4</option>
+                <option value="mp3">MP3</option>
+            </select>
+
+            <button type="submit" disabled="@isRunning">
+                @(isRunning ? "Converting..." : "Convert")
+            </button>
+        </form>
+
+        <div class="progress-container">
+            <div class="progress-bar" style="width: @(progress)%">@(progress)%</div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(result))
+        {
+            <div class="result">@result</div>
+        }
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="error">@error</div>
+        }
+
+    </div>
+</div>
+
+@code {
+    private string url = string.Empty;
+    private string format = "mp4";
+    private int progress;
+    private string result = string.Empty;
+    private string error = string.Empty;
+    private bool isRunning;
+
+    private async Task StartDownload()
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            error = "Bitte URL eingeben!";
+            return;
+        }
+
+        if (format != "mp3" && format != "mp4")
+        {
+            error = "Ungültiges Format.";
+            return;
+        }
+
+        isRunning = true;
+        progress = 0;
+        result = string.Empty;
+        error = string.Empty;
+
+        var downloadResult = await DownloadService.RunDownloadAsync(url, format, async p =>
+        {
+            progress = p;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        if (!downloadResult.Success)
+        {
+            error = "Download fehlgeschlagen. Bitte URL und Format überprüfen.";
+        }
+        else
+        {
+            result = downloadResult.AlreadyExisted
+                ? "✅ Already downloaded."
+                : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+        }
+
+        isRunning = false;
+        await InvokeAsync(StateHasChanged);
+    }
+}
