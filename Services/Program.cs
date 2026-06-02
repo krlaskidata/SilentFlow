@@ -1,42 +1,25 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System.Threading.RateLimiting;
+using SilentFlow.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorPages();
-builder.Services.AddSingleton<DownloadService>();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
+builder.Services.AddScoped<DownloadService>();
 
 var app = builder.Build();
 
-app.UseRateLimiter();
-
-app.Use(async (ctx, next) =>
+if (!app.Environment.IsDevelopment())
 {
-    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    ctx.Response.Headers["X-Frame-Options"] = "DENY";
-    ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
-    await next();
-});
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
+}
 
+app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseAntiforgery();
 
-app.MapRazorPages();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();
