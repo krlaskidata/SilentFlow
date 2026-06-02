@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System;
+using System.Net;
 using System.Text.RegularExpressions;
 
 public class DownloadService
@@ -14,6 +15,9 @@ public class DownloadService
 
     public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress)
     {
+        if (!IsValidUrl(url))
+            return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
+
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
 
@@ -106,6 +110,40 @@ public class DownloadService
 
         await onProgress(100);
         return DownloadResult.Succeeded(downloadPath, newFilesCount, false);
+    }
+
+    private static bool IsValidUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            return false;
+
+        var host = uri.Host.ToLowerInvariant();
+
+        if (host == "localhost" || host == "::1" || host == "0.0.0.0")
+            return false;
+
+        if (IPAddress.TryParse(host, out var ip))
+        {
+            var bytes = ip.GetAddressBytes();
+
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                if (bytes[0] == 127) return false;
+                if (bytes[0] == 10) return false;
+                if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return false;
+                if (bytes[0] == 192 && bytes[1] == 168) return false;
+            }
+
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                if (ip.Equals(IPAddress.IPv6Loopback)) return false;
+            }
+        }
+
+        return true;
     }
 }
 

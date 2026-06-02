@@ -53,6 +53,13 @@
             return;
         }
 
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) ||
+            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            error = "Bitte eine gültige HTTP/HTTPS-URL eingeben.";
+            return;
+        }
+
         if (format != "mp3" && format != "mp4")
         {
             error = "Ungültiges Format.";
