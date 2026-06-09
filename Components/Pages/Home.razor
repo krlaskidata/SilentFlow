@@ -79,7 +79,9 @@
 
         if (!downloadResult.Success)
         {
-            error = "Download fehlgeschlagen. Bitte URL und Format überprüfen.";
+            error = string.IsNullOrWhiteSpace(downloadResult.Message)
+                ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
+                : downloadResult.Message;
         }
         else
         {
