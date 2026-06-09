@@ -7,6 +7,7 @@ public class DownloadService
 {
     private readonly IWebHostEnvironment _environment;
     private static readonly Regex ProgressRegex = new(@"\[download\]\s+(\d{1,3}(?:\.\d+)?)%", RegexOptions.Compiled);
+    private static readonly SemaphoreSlim _concurrencyLimiter = new(5, 5);
 
     public DownloadService(IWebHostEnvironment environment)
     {
@@ -21,36 +22,59 @@ public class DownloadService
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
 
+        CleanupOldDownloads(downloadPath);
+
         var filesBefore = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         string outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
 
-        string cookiesArg;
-        if (!string.IsNullOrWhiteSpace(cookiesFilePath))
-        {
-            if (!File.Exists(cookiesFilePath))
-                return DownloadResult.Failed($"Cookies-Datei nicht gefunden: {cookiesFilePath}");
-            cookiesArg = $"--cookies \"{cookiesFilePath}\" ";
-        }
-        else if (!string.IsNullOrEmpty(cookiesBrowser) && cookiesBrowser != "none")
-        {
-            cookiesArg = $"--cookies-from-browser {cookiesBrowser} ";
-        }
-        else
-        {
-            cookiesArg = "";
-        }
+        if (!string.IsNullOrWhiteSpace(cookiesFilePath) && !File.Exists(cookiesFilePath))
+            return DownloadResult.Failed($"Cookies-Datei nicht gefunden: {cookiesFilePath}");
 
-        string args = format == "mp3"
-            ? $"{cookiesArg}--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
-            : $"{cookiesArg}--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
+        if (!await _concurrencyLimiter.WaitAsync(TimeSpan.FromSeconds(10)))
+            return DownloadResult.Failed("Der Server ist gerade ausgelastet. Bitte kurz warten und es erneut versuchen.");
 
         var outputLines = new List<string>();
         var sync = new object();
 
         var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
-        process.StartInfo.Arguments = args;
+
+        if (!string.IsNullOrWhiteSpace(cookiesFilePath))
+        {
+            process.StartInfo.ArgumentList.Add("--cookies");
+            process.StartInfo.ArgumentList.Add(cookiesFilePath);
+        }
+        else if (!string.IsNullOrEmpty(cookiesBrowser) && cookiesBrowser != "none")
+        {
+            process.StartInfo.ArgumentList.Add("--cookies-from-browser");
+            process.StartInfo.ArgumentList.Add(cookiesBrowser);
+        }
+
+        process.StartInfo.ArgumentList.Add("--force-ipv4");
+        process.StartInfo.ArgumentList.Add("--windows-filenames");
+        process.StartInfo.ArgumentList.Add("--trim-filenames");
+        process.StartInfo.ArgumentList.Add("120");
+        process.StartInfo.ArgumentList.Add("--max-filesize");
+        process.StartInfo.ArgumentList.Add("2G");
+
+        if (format == "mp3")
+        {
+            process.StartInfo.ArgumentList.Add("-x");
+            process.StartInfo.ArgumentList.Add("--audio-format");
+            process.StartInfo.ArgumentList.Add("mp3");
+        }
+        else
+        {
+            process.StartInfo.ArgumentList.Add("-f");
+            process.StartInfo.ArgumentList.Add("bv*+ba/b");
+        }
+
+        process.StartInfo.ArgumentList.Add("--newline");
+        process.StartInfo.ArgumentList.Add("-o");
+        process.StartInfo.ArgumentList.Add(outputTemplate);
+        process.StartInfo.ArgumentList.Add(url);
+
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
         process.StartInfo.UseShellExecute = false;
@@ -59,6 +83,7 @@ public class DownloadService
 
         if (!process.Start())
         {
+            _concurrencyLimiter.Release();
             return DownloadResult.Failed("yt-dlp konnte nicht gestartet werden.");
         }
 
@@ -110,6 +135,10 @@ public class DownloadService
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             return DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
+        }
+        finally
+        {
+            _concurrencyLimiter.Release();
         }
 
         var filesAfter = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -168,6 +197,20 @@ public class DownloadService
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             return "Update-Timeout: yt-dlp hat nicht rechtzeitig geantwortet.";
+        }
+    }
+
+    private static void CleanupOldDownloads(string downloadPath)
+    {
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        foreach (var file in Directory.GetFiles(downloadPath))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    File.Delete(file);
+            }
+            catch { }
         }
     }
 
