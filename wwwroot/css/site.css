@@ -202,6 +202,21 @@ form button[type="submit"]:disabled {
   flex: 1;
 }
 
+.info-bar {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.info-bar a {
+  color: #7b2fbe;
+  text-decoration: none;
+}
+
+.info-bar a:hover {
+  text-decoration: underline;
+}
+
 /* === Responsive === */
 
 @media (max-width: 520px) {

@@ -124,11 +124,11 @@ public class DownloadService
 
     public async Task<string> UpdateYtDlpAsync()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
-        process.StartInfo.Arguments = "-U";
+        process.StartInfo.Arguments = "--update-to nightly";
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
         process.StartInfo.UseShellExecute = false;
