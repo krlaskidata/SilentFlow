@@ -8,7 +8,7 @@
     <div class="container">
 
         <form @onsubmit="StartDownload" @onsubmit:preventDefault="true">
-            <input @bind="url" @bind:event="oninput" placeholder="Video URL einfügen..." />
+            <input @bind="url" @bind:event="oninput" placeholder="YouTube, Instagram, Facebook, TikTok URL..." />
 
             <select @bind="format">
                 <option value="mp4">MP4</option>
@@ -50,6 +50,42 @@
         </div>
 
     </div>
+
+    <div class="container">
+
+        <form @onsubmit="StartDownload2" @onsubmit:preventDefault="true">
+            <input @bind="url2" @bind:event="oninput" placeholder="Externen URL eingeben..." />
+
+            <select @bind="format2">
+                <option value="mp4">MP4</option>
+                <option value="mp3">MP3</option>
+            </select>
+
+            <button type="submit" disabled="@isRunning2">
+                @(isRunning2 ? "Converting..." : "Convert")
+            </button>
+        </form>
+
+        <div class="progress-container">
+            <div class="progress-bar" style="width: @(progress2)%">@(progress2)%</div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(result2))
+        {
+            <div class="result">@result2</div>
+        }
+
+        @if (!string.IsNullOrEmpty(error2))
+        {
+            <div class="error">@error2</div>
+        }
+
+        <div class="info-bar">
+            <span class="disclaimer">Nur für Inhalte verwenden, die du herunterladen darfst.</span>
+            <a class="author-link" href="https://github.com/krlaskidata" target="_blank">Laura B. Kraft</a>
+        </div>
+
+    </div>
 </div>
 
 @code {
@@ -63,6 +99,14 @@
 
     private bool isUpdating;
     private string updateMessage = string.Empty;
+
+    private string url2 = string.Empty;
+    private string format2 = "mp4";
+    private int progress2;
+    private string result2 = string.Empty;
+    private string error2 = string.Empty;
+    private bool isRunning2;
+    private CancellationTokenSource? _progressCts2;
 
     private async Task UpdateYtDlp()
     {
@@ -142,6 +186,79 @@
             var t = Math.Min((DateTime.UtcNow - start).TotalSeconds / totalSeconds, 1.0);
             var eased = 1.0 - Math.Pow(1.0 - t, 2.0);
             progress = Math.Max(1, (int)(eased * 88));
+            await InvokeAsync(StateHasChanged);
+
+            try { await Task.Delay(80, token); }
+            catch (OperationCanceledException) { break; }
+        }
+    }
+
+    private async Task StartDownload2()
+    {
+        if (string.IsNullOrWhiteSpace(url2))
+        {
+            error2 = "Bitte URL eingeben!";
+            return;
+        }
+
+        if (!Uri.TryCreate(url2, UriKind.Absolute, out var parsed) ||
+            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            error2 = "Bitte eine gültige HTTP/HTTPS-URL eingeben.";
+            return;
+        }
+
+        if (format2 != "mp3" && format2 != "mp4")
+        {
+            error2 = "Ungültiges Format.";
+            return;
+        }
+
+        isRunning2 = true;
+        progress2 = 0;
+        result2 = string.Empty;
+        error2 = string.Empty;
+
+        _progressCts2 = new CancellationTokenSource();
+        _ = AnimateProgress2(_progressCts2.Token);
+
+        try
+        {
+            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask);
+
+            if (!downloadResult.Success)
+            {
+                progress2 = 0;
+                error2 = string.IsNullOrWhiteSpace(downloadResult.Message)
+                    ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
+                    : downloadResult.Message;
+            }
+            else
+            {
+                progress2 = 100;
+                result2 = downloadResult.AlreadyExisted
+                    ? "✅ Already downloaded."
+                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+            }
+        }
+        finally
+        {
+            await _progressCts2.CancelAsync();
+            isRunning2 = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task AnimateProgress2(CancellationToken token)
+    {
+        var start = DateTime.UtcNow;
+        const double totalSeconds = 8.0;
+
+        while (!token.IsCancellationRequested)
+        {
+            var t = Math.Min((DateTime.UtcNow - start).TotalSeconds / totalSeconds, 1.0);
+            var eased = 1.0 - Math.Pow(1.0 - t, 2.0);
+            progress2 = Math.Max(1, (int)(eased * 88));
             await InvokeAsync(StateHasChanged);
 
             try { await Task.Delay(80, token); }

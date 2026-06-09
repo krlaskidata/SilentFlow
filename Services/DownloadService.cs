@@ -13,7 +13,7 @@ public class DownloadService
         _environment = environment;
     }
 
-    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress)
+    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string? cookiesBrowser = null, string? cookiesFilePath = null)
     {
         if (!IsValidUrl(url))
             return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
@@ -25,9 +25,25 @@ public class DownloadService
 
         string outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
 
+        string cookiesArg;
+        if (!string.IsNullOrWhiteSpace(cookiesFilePath))
+        {
+            if (!File.Exists(cookiesFilePath))
+                return DownloadResult.Failed($"Cookies-Datei nicht gefunden: {cookiesFilePath}");
+            cookiesArg = $"--cookies \"{cookiesFilePath}\" ";
+        }
+        else if (!string.IsNullOrEmpty(cookiesBrowser) && cookiesBrowser != "none")
+        {
+            cookiesArg = $"--cookies-from-browser {cookiesBrowser} ";
+        }
+        else
+        {
+            cookiesArg = "";
+        }
+
         string args = format == "mp3"
-            ? $"--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
-            : $"--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
+            ? $"{cookiesArg}--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
+            : $"{cookiesArg}--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
 
         var outputLines = new List<string>();
         var sync = new object();
