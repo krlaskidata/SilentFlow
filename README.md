@@ -27,20 +27,10 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Runs entirely on your mac
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — place `yt-dlp.exe` in the project root (or use the built-in update button)
 - Windows
 
-## Getting Started
-
-```bash
-git clone https://github.com/krlaskidata/SilentFlow.git
-cd SilentFlow
-dotnet run
-```
-
-Then open your browser at `https://localhost:5001`.
-
 ## Legal
 
 SilentFlow is a tool for personal use. You are responsible for complying with the terms of service of any platform you use it with and the applicable copyright laws in your country. The author assumes no liability for misuse.
 
 ---
 
-Made by [Laura B. Kraft](https://github.com/krlaskidata)
+Made by [KRLA](https://github.com/krlaskidata)
