@@ -22,6 +22,8 @@ public class DownloadService
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
 
+        CleanupOldDownloads(downloadPath);
+
         var filesBefore = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         string outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
@@ -53,6 +55,8 @@ public class DownloadService
         process.StartInfo.ArgumentList.Add("--windows-filenames");
         process.StartInfo.ArgumentList.Add("--trim-filenames");
         process.StartInfo.ArgumentList.Add("120");
+        process.StartInfo.ArgumentList.Add("--max-filesize");
+        process.StartInfo.ArgumentList.Add("2G");
 
         if (format == "mp3")
         {
@@ -193,6 +197,20 @@ public class DownloadService
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             return "Update-Timeout: yt-dlp hat nicht rechtzeitig geantwortet.";
+        }
+    }
+
+    private static void CleanupOldDownloads(string downloadPath)
+    {
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        foreach (var file in Directory.GetFiles(downloadPath))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < cutoff)
+                    File.Delete(file);
+            }
+            catch { }
         }
     }
 
