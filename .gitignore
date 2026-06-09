@@ -1,6 +1,12 @@
 # Downloads
 downloads/
 
+# Third-party frontend libraries
+wwwroot/lib/
+
+# Solution file
+SilentFlow.sln
+
 # Python
 .venv/
 venv/

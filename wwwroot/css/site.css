@@ -204,16 +204,26 @@ form button[type="submit"]:disabled {
 
 .info-bar {
   margin-top: 10px;
-  font-size: 0.8rem;
-  color: #999;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
-.info-bar a {
+.disclaimer {
+  font-size: 0.78rem;
+  color: #bbb;
+}
+
+.author-link {
+  font-size: 0.82rem;
+  font-weight: 600;
   color: #7b2fbe;
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.info-bar a:hover {
+.author-link:hover {
   text-decoration: underline;
 }
 
