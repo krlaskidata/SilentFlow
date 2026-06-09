@@ -66,6 +66,21 @@
             </button>
         </form>
 
+        <div class="browser-row">
+            <label>Browser-Cookies:</label>
+            <select @bind="browser2">
+                <option value="none">Kein</option>
+                <option value="chrome">Chrome</option>
+                <option value="firefox">Firefox</option>
+                <option value="edge">Edge</option>
+            </select>
+        </div>
+
+        <div class="browser-row">
+            <label>Cookies-Datei:</label>
+            <input type="text" @bind="cookiesFilePath2" @bind:event="oninput" placeholder="optional — Pfad zur cookies.txt" />
+        </div>
+
         <div class="progress-container">
             <div class="progress-bar" style="width: @(progress2)%">@(progress2)%</div>
         </div>
@@ -102,6 +117,8 @@
 
     private string url2 = string.Empty;
     private string format2 = "mp4";
+    private string browser2 = "none";
+    private string cookiesFilePath2 = string.Empty;
     private int progress2;
     private string result2 = string.Empty;
     private string error2 = string.Empty;
@@ -224,7 +241,7 @@
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask);
+            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, browser2, cookiesFilePath2);
 
             if (!downloadResult.Success)
             {

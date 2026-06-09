@@ -162,6 +162,45 @@ form button[type="submit"]:disabled {
 
 /* === Update bar === */
 
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.browser-row label {
+  font-size: 0.82rem;
+  color: #888;
+  white-space: nowrap;
+}
+
+.browser-row select {
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1.5px solid #c9b8dc;
+  color: #4a0072;
+  background: #f9f4ff;
+  cursor: pointer;
+}
+
+.browser-row input[type="text"] {
+  flex: 1;
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1.5px solid #c9b8dc;
+  color: #4a0072;
+  background: #f9f4ff;
+  outline: none;
+}
+
+.browser-row input[type="text"]:focus {
+  border-color: #7b2fbe;
+}
+
 .update-bar {
   margin-top: 28px;
   padding-top: 20px;
