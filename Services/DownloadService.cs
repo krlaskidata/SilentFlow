@@ -26,8 +26,8 @@ public class DownloadService
         string outputTemplate = Path.Combine(downloadPath, "%(title)s.%(ext)s");
 
         string args = format == "mp3"
-            ? $"--no-check-certificate --force-ipv4 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
-            : $"--no-check-certificate --force-ipv4 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
+            ? $"--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -x --audio-format mp3 --newline -o \"{outputTemplate}\" \"{url}\""
+            : $"--no-check-certificate --force-ipv4 --windows-filenames --trim-filenames 120 -f \"bv*+ba/b\" --newline -o \"{outputTemplate}\" \"{url}\"";
 
         var outputLines = new List<string>();
         var sync = new object();
@@ -92,7 +92,7 @@ public class DownloadService
 
         if (process.ExitCode != 0)
         {
-            var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
+            var message = string.Join(Environment.NewLine, RelevantLines(outputLines));
             return DownloadResult.Failed($"yt-dlp Fehler (ExitCode {process.ExitCode}).{Environment.NewLine}{message}");
         }
 
@@ -104,13 +104,40 @@ public class DownloadService
 
         if (newFilesCount == 0)
         {
-            var message = string.Join(Environment.NewLine, outputLines.TakeLast(8));
+            var message = string.Join(Environment.NewLine, RelevantLines(outputLines));
             return DownloadResult.Failed($"Kein Download gespeichert.{Environment.NewLine}{message}");
         }
 
         await onProgress(100);
         return DownloadResult.Succeeded(downloadPath, newFilesCount, false);
     }
+
+    public async Task<string> UpdateYtDlpAsync()
+    {
+        var process = new Process();
+        process.StartInfo.FileName = "yt-dlp.exe";
+        process.StartInfo.Arguments = "-U";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
+        process.StartInfo.WorkingDirectory = _environment.ContentRootPath;
+
+        if (!process.Start())
+            return "yt-dlp konnte nicht gestartet werden.";
+
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        var combined = (stdout + stderr).Trim();
+        return string.IsNullOrWhiteSpace(combined) ? "Update abgeschlossen." : combined;
+    }
+
+    private static IEnumerable<string> RelevantLines(List<string> lines) =>
+        lines
+            .Where(l => l.StartsWith('[') || l.StartsWith("ERROR:") || l.StartsWith("WARNING:") || l.StartsWith("Merging"))
+            .TakeLast(8);
 
     private static bool IsValidUrl(string url)
     {

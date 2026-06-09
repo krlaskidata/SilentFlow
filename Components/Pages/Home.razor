@@ -34,6 +34,16 @@
             <div class="error">@error</div>
         }
 
+        <div class="update-bar">
+            <button class="btn-update" @onclick="UpdateYtDlp" disabled="@(isRunning || isUpdating)">
+                @(isUpdating ? "Updating..." : "yt-dlp aktualisieren")
+            </button>
+            @if (!string.IsNullOrEmpty(updateMessage))
+            {
+                <span class="update-msg">@updateMessage</span>
+            }
+        </div>
+
     </div>
 </div>
 
@@ -44,6 +54,22 @@
     private string result = string.Empty;
     private string error = string.Empty;
     private bool isRunning;
+    private CancellationTokenSource? _progressCts;
+
+    private bool isUpdating;
+    private string updateMessage = string.Empty;
+
+    private async Task UpdateYtDlp()
+    {
+        isUpdating = true;
+        updateMessage = string.Empty;
+        await InvokeAsync(StateHasChanged);
+
+        updateMessage = await DownloadService.UpdateYtDlpAsync();
+
+        isUpdating = false;
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task StartDownload()
     {
@@ -71,20 +97,23 @@
         result = string.Empty;
         error = string.Empty;
 
-        var downloadResult = await DownloadService.RunDownloadAsync(url, format, async p =>
-        {
-            progress = p;
-            await InvokeAsync(StateHasChanged);
-        });
+        _progressCts = new CancellationTokenSource();
+        _ = AnimateProgress(_progressCts.Token);
+
+        var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask);
+
+        await _progressCts.CancelAsync();
 
         if (!downloadResult.Success)
         {
+            progress = 0;
             error = string.IsNullOrWhiteSpace(downloadResult.Message)
                 ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
                 : downloadResult.Message;
         }
         else
         {
+            progress = 100;
             result = downloadResult.AlreadyExisted
                 ? "✅ Already downloaded."
                 : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
@@ -92,5 +121,22 @@
 
         isRunning = false;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AnimateProgress(CancellationToken token)
+    {
+        var start = DateTime.UtcNow;
+        const double totalSeconds = 8.0;
+
+        while (!token.IsCancellationRequested)
+        {
+            var t = Math.Min((DateTime.UtcNow - start).TotalSeconds / totalSeconds, 1.0);
+            var eased = 1.0 - Math.Pow(1.0 - t, 2.0);
+            progress = Math.Max(1, (int)(eased * 88));
+            await InvokeAsync(StateHasChanged);
+
+            try { await Task.Delay(80, token); }
+            catch (OperationCanceledException) { break; }
+        }
     }
 }
