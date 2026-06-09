@@ -100,27 +100,31 @@
         _progressCts = new CancellationTokenSource();
         _ = AnimateProgress(_progressCts.Token);
 
-        var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask);
-
-        await _progressCts.CancelAsync();
-
-        if (!downloadResult.Success)
+        try
         {
-            progress = 0;
-            error = string.IsNullOrWhiteSpace(downloadResult.Message)
-                ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
-                : downloadResult.Message;
-        }
-        else
-        {
-            progress = 100;
-            result = downloadResult.AlreadyExisted
-                ? "✅ Already downloaded."
-                : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
-        }
+            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask);
 
-        isRunning = false;
-        await InvokeAsync(StateHasChanged);
+            if (!downloadResult.Success)
+            {
+                progress = 0;
+                error = string.IsNullOrWhiteSpace(downloadResult.Message)
+                    ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
+                    : downloadResult.Message;
+            }
+            else
+            {
+                progress = 100;
+                result = downloadResult.AlreadyExisted
+                    ? "✅ Already downloaded."
+                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+            }
+        }
+        finally
+        {
+            await _progressCts.CancelAsync();
+            isRunning = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task AnimateProgress(CancellationToken token)

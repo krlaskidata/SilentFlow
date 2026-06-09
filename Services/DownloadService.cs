@@ -80,11 +80,21 @@ public class DownloadService
             }
         }
 
-        await Task.WhenAll(
-            ConsumeStreamAsync(process.StandardOutput),
-            ConsumeStreamAsync(process.StandardError));
+        using var downloadTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
 
-        await process.WaitForExitAsync();
+        try
+        {
+            await Task.WhenAll(
+                ConsumeStreamAsync(process.StandardOutput),
+                ConsumeStreamAsync(process.StandardError));
+
+            await process.WaitForExitAsync(downloadTimeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            return DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
+        }
 
         var filesAfter = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var newFilesCount = filesAfter.Except(filesBefore).Count();
@@ -114,6 +124,8 @@ public class DownloadService
 
     public async Task<string> UpdateYtDlpAsync()
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
         var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
         process.StartInfo.Arguments = "-U";
@@ -126,12 +138,21 @@ public class DownloadService
         if (!process.Start())
             return "yt-dlp konnte nicht gestartet werden.";
 
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        try
+        {
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(cts.Token);
+            await Task.WhenAll(stdoutTask, stderrTask);
+            await process.WaitForExitAsync(cts.Token);
 
-        var combined = (stdout + stderr).Trim();
-        return string.IsNullOrWhiteSpace(combined) ? "Update abgeschlossen." : combined;
+            var combined = (stdoutTask.Result + stderrTask.Result).Trim();
+            return string.IsNullOrWhiteSpace(combined) ? "Update abgeschlossen." : combined;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            return "Update-Timeout: yt-dlp hat nicht rechtzeitig geantwortet.";
+        }
     }
 
     private static IEnumerable<string> RelevantLines(List<string> lines) =>
