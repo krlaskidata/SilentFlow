@@ -12,7 +12,7 @@ html, body {
   color: #1a1a2e;
 }
 
-/* ── Header ─────────────────────────────────────────────── */
+/* === Header === */
 
 .header {
   background: #4a0072;
@@ -27,7 +27,7 @@ html, body {
   letter-spacing: 0.04em;
 }
 
-/* ── Page layout ─────────────────────────────────────────── */
+/* === Page layout === */
 
 .main {
   display: flex;
@@ -46,7 +46,7 @@ html, body {
   max-width: 640px;
 }
 
-/* ── Form ────────────────────────────────────────────────── */
+/* === Form === */
 
 form {
   display: flex;
@@ -110,7 +110,7 @@ form button[type="submit"]:disabled {
   cursor: not-allowed;
 }
 
-/* ── Progress bar ────────────────────────────────────────── */
+/* === Progress bar === */
 
 .progress-container {
   margin-top: 24px;
@@ -135,7 +135,7 @@ form button[type="submit"]:disabled {
   transition: width 0.3s ease;
 }
 
-/* ── Result & error messages ─────────────────────────────── */
+/* === Result & error messages === */
 
 .result {
   margin-top: 20px;
@@ -159,7 +159,7 @@ form button[type="submit"]:disabled {
   word-break: break-word;
 }
 
-/* ── Responsive ──────────────────────────────────────────── */
+/* === Responsive === */
 
 @media (max-width: 520px) {
   .container {
