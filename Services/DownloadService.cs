@@ -19,7 +19,7 @@ public class DownloadService
         _environment = environment;
     }
 
-    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string ip = "unknown", string? cookiesBrowser = null, string? cookiesFilePath = null)
+    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string ip = "unknown", CancellationToken cancellationToken = default, string? cookiesBrowser = null, string? cookiesFilePath = null)
     {
         if (!IsValidUrl(url))
             return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
@@ -133,19 +133,22 @@ public class DownloadService
         }
 
         using var downloadTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(downloadTimeout.Token, cancellationToken);
 
         try
         {
             await Task.WhenAll(
-                ConsumeStreamAsync(process.StandardOutput, downloadTimeout.Token),
-                ConsumeStreamAsync(process.StandardError, downloadTimeout.Token));
+                ConsumeStreamAsync(process.StandardOutput, linked.Token),
+                ConsumeStreamAsync(process.StandardError, linked.Token));
 
-            await process.WaitForExitAsync(downloadTimeout.Token);
+            await process.WaitForExitAsync(linked.Token);
         }
         catch (OperationCanceledException)
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
-            return DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
+            return cancellationToken.IsCancellationRequested
+                ? DownloadResult.Failed("Download wurde abgebrochen.")
+                : DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
         }
         finally
         {

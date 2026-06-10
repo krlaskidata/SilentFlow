@@ -114,6 +114,7 @@
     private bool isRunning;
     private List<string> downloadedFiles = [];
     private CancellationTokenSource? _progressCts;
+    private CancellationTokenSource? _downloadCts;
 
     private string url2 = string.Empty;
     private string format2 = "mp4";
@@ -123,6 +124,7 @@
     private bool isRunning2;
     private List<string> downloadedFiles2 = [];
     private CancellationTokenSource? _progressCts2;
+    private CancellationTokenSource? _downloadCts2;
 
     protected override void OnInitialized()
     {
@@ -133,6 +135,8 @@
 
     private async Task ResetAll()
     {
+        if (_downloadCts is not null) await _downloadCts.CancelAsync();
+        if (_downloadCts2 is not null) await _downloadCts2.CancelAsync();
         if (_progressCts is not null) await _progressCts.CancelAsync();
         if (_progressCts2 is not null) await _progressCts2.CancelAsync();
 
@@ -181,12 +185,13 @@
         result = string.Empty;
         error = string.Empty;
 
+        _downloadCts = new CancellationTokenSource();
         _progressCts = new CancellationTokenSource();
         _ = AnimateProgress(_progressCts.Token);
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask, _clientIp);
+            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask, _clientIp, _downloadCts.Token);
 
             if (!downloadResult.Success)
             {
@@ -260,12 +265,13 @@
         result2 = string.Empty;
         error2 = string.Empty;
 
+        _downloadCts2 = new CancellationTokenSource();
         _progressCts2 = new CancellationTokenSource();
         _ = AnimateProgress2(_progressCts2.Token);
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, _clientIp);
+            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, _clientIp, _downloadCts2.Token);
 
             if (!downloadResult.Success)
             {
