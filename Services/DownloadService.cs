@@ -87,11 +87,11 @@ public class DownloadService
             return DownloadResult.Failed("yt-dlp konnte nicht gestartet werden.");
         }
 
-        async Task ConsumeStreamAsync(StreamReader reader)
+        async Task ConsumeStreamAsync(StreamReader reader, CancellationToken token)
         {
             while (true)
             {
-                var line = await reader.ReadLineAsync();
+                var line = await reader.ReadLineAsync(token);
                 if (line is null)
                 {
                     break;
@@ -126,8 +126,8 @@ public class DownloadService
         try
         {
             await Task.WhenAll(
-                ConsumeStreamAsync(process.StandardOutput),
-                ConsumeStreamAsync(process.StandardError));
+                ConsumeStreamAsync(process.StandardOutput, downloadTimeout.Token),
+                ConsumeStreamAsync(process.StandardError, downloadTimeout.Token));
 
             await process.WaitForExitAsync(downloadTimeout.Token);
         }
@@ -221,6 +221,9 @@ public class DownloadService
 
     private static bool IsValidUrl(string url)
     {
+        if (string.IsNullOrWhiteSpace(url) || url.Length > 2048)
+            return false;
+
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return false;
 
@@ -242,11 +245,13 @@ public class DownloadService
                 if (bytes[0] == 10) return false;
                 if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return false;
                 if (bytes[0] == 192 && bytes[1] == 168) return false;
+                if (bytes[0] == 169 && bytes[1] == 254) return false;
             }
 
             if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
                 if (ip.Equals(IPAddress.IPv6Loopback)) return false;
+                if (ip.IsIPv6LinkLocal) return false;
             }
         }
 

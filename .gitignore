@@ -1,6 +1,9 @@
 # Downloads
 downloads/
 
+# Production config (contains domain names)
+Properties/appsettings.Production.json
+
 # Third-party frontend libraries
 wwwroot/lib/
 
