@@ -1,0 +1,25 @@
+@page "/login"
+@attribute [AllowAnonymous]
+
+<PageTitle>Login — SilentFlow</PageTitle>
+
+<div class="login-wrapper">
+    <div class="login-box">
+        <div class="login-title">SilentFlow</div>
+
+        <form method="post" action="/login-action">
+            <input type="password" name="password" placeholder="Passwort..." autofocus />
+            <button type="submit">Anmelden</button>
+        </form>
+
+        @if (Failed)
+        {
+            <div class="login-error">Falsches Passwort.</div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "failed")]
+    public bool Failed { get; set; }
+}
