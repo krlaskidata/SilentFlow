@@ -49,6 +49,13 @@
             <button class="btn-update" @onclick="ResetAll">
                 Zurücksetzen
             </button>
+            <button class="btn-update" @onclick="UpdateYtDlp" disabled="@isUpdating">
+                @(isUpdating ? "Aktualisiert..." : "yt-dlp aktualisieren")
+            </button>
+            @if (!string.IsNullOrEmpty(updateMessage))
+            {
+                <span class="update-msg">@updateMessage</span>
+            }
         </div>
 
         <div class="info-bar">
@@ -107,6 +114,9 @@
 @code {
     private string _clientIp = "unknown";
 
+    private bool isUpdating;
+    private string updateMessage = string.Empty;
+
     private string url = string.Empty;
     private string format = "mp4";
     private int progress;
@@ -132,6 +142,17 @@
         var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
         if (!string.IsNullOrEmpty(ip))
             _clientIp = ip;
+    }
+
+    private async Task UpdateYtDlp()
+    {
+        isUpdating = true;
+        updateMessage = string.Empty;
+        await InvokeAsync(StateHasChanged);
+
+        updateMessage = await DownloadService.UpdateYtDlpAsync();
+        isUpdating = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task ResetAll()
