@@ -87,11 +87,11 @@ public class DownloadService
             return DownloadResult.Failed("yt-dlp konnte nicht gestartet werden.");
         }
 
-        async Task ConsumeStreamAsync(StreamReader reader)
+        async Task ConsumeStreamAsync(StreamReader reader, CancellationToken token)
         {
             while (true)
             {
-                var line = await reader.ReadLineAsync();
+                var line = await reader.ReadLineAsync(token);
                 if (line is null)
                 {
                     break;
@@ -126,8 +126,8 @@ public class DownloadService
         try
         {
             await Task.WhenAll(
-                ConsumeStreamAsync(process.StandardOutput),
-                ConsumeStreamAsync(process.StandardError));
+                ConsumeStreamAsync(process.StandardOutput, downloadTimeout.Token),
+                ConsumeStreamAsync(process.StandardError, downloadTimeout.Token));
 
             await process.WaitForExitAsync(downloadTimeout.Token);
         }
