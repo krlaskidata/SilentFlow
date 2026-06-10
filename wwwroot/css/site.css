@@ -18,6 +18,8 @@ html, body {
   background: #4a0072;
   padding: 18px 32px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
 }
 
 .header .title {
@@ -226,6 +228,77 @@ form button[type="submit"]:disabled {
 
 .author-link:hover {
   text-decoration: underline;
+}
+
+.download-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 14px;
+  background: #f3eafa;
+  border: 1.5px solid #c9b8dc;
+  border-radius: 8px;
+  color: #7b2fbe;
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+  word-break: break-all;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.download-link:hover {
+  background: #ede0f5;
+  border-color: #7b2fbe;
+}
+
+/* === Login === */
+
+.login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #f0eaf7;
+}
+
+.login-box {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(74, 0, 114, 0.12);
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #4a0072;
+  letter-spacing: 0.04em;
+  margin-bottom: 28px;
+}
+
+.login-error {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #fdecea;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  color: #c62828;
+  font-size: 0.9rem;
+}
+
+.btn-logout {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.btn-logout:hover {
+  color: #fff;
 }
 
 /* === Responsive === */

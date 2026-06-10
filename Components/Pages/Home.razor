@@ -1,6 +1,8 @@
 @page "/"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject DownloadService DownloadService
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>SilentFlow</PageTitle>
 
@@ -24,9 +26,18 @@
             <div class="progress-bar" style="width: @(progress)%">@(progress)%</div>
         </div>
 
-        @if (!string.IsNullOrEmpty(result))
+        @if (!string.IsNullOrEmpty(result) || downloadedFiles.Count > 0)
         {
-            <div class="result">@result</div>
+            <div class="result">
+                @if (!string.IsNullOrEmpty(result))
+                {
+                    <span>@result</span>
+                }
+                @foreach (var file in downloadedFiles)
+                {
+                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
+                }
+            </div>
         }
 
         @if (!string.IsNullOrEmpty(error))
@@ -38,6 +49,13 @@
             <button class="btn-update" @onclick="ResetAll">
                 Zurücksetzen
             </button>
+            <button class="btn-update" @onclick="UpdateYtDlp" disabled="@isUpdating">
+                @(isUpdating ? "Aktualisiert..." : "yt-dlp aktualisieren")
+            </button>
+            @if (!string.IsNullOrEmpty(updateMessage))
+            {
+                <span class="update-msg">@updateMessage</span>
+            }
         </div>
 
         <div class="info-bar">
@@ -66,9 +84,18 @@
             <div class="progress-bar" style="width: @(progress2)%">@(progress2)%</div>
         </div>
 
-        @if (!string.IsNullOrEmpty(result2))
+        @if (!string.IsNullOrEmpty(result2) || downloadedFiles2.Count > 0)
         {
-            <div class="result">@result2</div>
+            <div class="result">
+                @if (!string.IsNullOrEmpty(result2))
+                {
+                    <span>@result2</span>
+                }
+                @foreach (var file in downloadedFiles2)
+                {
+                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
+                }
+            </div>
         }
 
         @if (!string.IsNullOrEmpty(error2))
@@ -85,13 +112,20 @@
 </div>
 
 @code {
+    private string _clientIp = "unknown";
+
+    private bool isUpdating;
+    private string updateMessage = string.Empty;
+
     private string url = string.Empty;
     private string format = "mp4";
     private int progress;
     private string result = string.Empty;
     private string error = string.Empty;
     private bool isRunning;
+    private List<string> downloadedFiles = [];
     private CancellationTokenSource? _progressCts;
+    private CancellationTokenSource? _downloadCts;
 
     private string url2 = string.Empty;
     private string format2 = "mp4";
@@ -99,10 +133,32 @@
     private string result2 = string.Empty;
     private string error2 = string.Empty;
     private bool isRunning2;
+    private List<string> downloadedFiles2 = [];
     private CancellationTokenSource? _progressCts2;
+    private CancellationTokenSource? _downloadCts2;
+
+    protected override void OnInitialized()
+    {
+        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        if (!string.IsNullOrEmpty(ip))
+            _clientIp = ip;
+    }
+
+    private async Task UpdateYtDlp()
+    {
+        isUpdating = true;
+        updateMessage = string.Empty;
+        await InvokeAsync(StateHasChanged);
+
+        updateMessage = await DownloadService.UpdateYtDlpAsync();
+        isUpdating = false;
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task ResetAll()
     {
+        if (_downloadCts is not null) await _downloadCts.CancelAsync();
+        if (_downloadCts2 is not null) await _downloadCts2.CancelAsync();
         if (_progressCts is not null) await _progressCts.CancelAsync();
         if (_progressCts2 is not null) await _progressCts2.CancelAsync();
 
@@ -112,6 +168,7 @@
         result = string.Empty;
         error = string.Empty;
         isRunning = false;
+        downloadedFiles = [];
 
         url2 = string.Empty;
         format2 = "mp4";
@@ -119,12 +176,14 @@
         result2 = string.Empty;
         error2 = string.Empty;
         isRunning2 = false;
+        downloadedFiles2 = [];
 
         await InvokeAsync(StateHasChanged);
     }
 
     private async Task StartDownload()
     {
+        if (isRunning) return;
         if (string.IsNullOrWhiteSpace(url))
         {
             error = "Bitte URL eingeben!";
@@ -149,12 +208,13 @@
         result = string.Empty;
         error = string.Empty;
 
+        _downloadCts = new CancellationTokenSource();
         _progressCts = new CancellationTokenSource();
         _ = AnimateProgress(_progressCts.Token);
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask);
+            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask, _clientIp, _downloadCts.Token);
 
             if (!downloadResult.Success)
             {
@@ -166,9 +226,15 @@
             else
             {
                 progress = 100;
-                result = downloadResult.AlreadyExisted
-                    ? "✅ Already downloaded."
-                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+                if (downloadResult.AlreadyExisted)
+                {
+                    result = "✅ Already downloaded.";
+                }
+                else
+                {
+                    result = "✅ Download complete!";
+                    downloadedFiles = [.. downloadResult.FileNames];
+                }
             }
         }
         finally
@@ -198,6 +264,8 @@
 
     private async Task StartDownload2()
     {
+        if (isRunning2) return;
+
         if (string.IsNullOrWhiteSpace(url2))
         {
             error2 = "Bitte URL eingeben!";
@@ -222,12 +290,13 @@
         result2 = string.Empty;
         error2 = string.Empty;
 
+        _downloadCts2 = new CancellationTokenSource();
         _progressCts2 = new CancellationTokenSource();
         _ = AnimateProgress2(_progressCts2.Token);
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask);
+            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, _clientIp, _downloadCts2.Token);
 
             if (!downloadResult.Success)
             {
@@ -239,9 +308,15 @@
             else
             {
                 progress2 = 100;
-                result2 = downloadResult.AlreadyExisted
-                    ? "✅ Already downloaded."
-                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+                if (downloadResult.AlreadyExisted)
+                {
+                    result2 = "✅ Already downloaded.";
+                }
+                else
+                {
+                    result2 = "✅ Download complete!";
+                    downloadedFiles2 = [.. downloadResult.FileNames];
+                }
             }
         }
         finally
