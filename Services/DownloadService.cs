@@ -63,6 +63,7 @@ public class DownloadService
         }
 
         process.StartInfo.ArgumentList.Add("--force-ipv4");
+        process.StartInfo.ArgumentList.Add("--no-check-certificates");
         process.StartInfo.ArgumentList.Add("--windows-filenames");
         process.StartInfo.ArgumentList.Add("--trim-filenames");
         process.StartInfo.ArgumentList.Add("120");
