@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 public class DownloadService
 {
     private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<DownloadService> _logger;
     private static readonly Regex ProgressRegex = new(@"\[download\]\s+(\d{1,3}(?:\.\d+)?)%", RegexOptions.Compiled);
     private static readonly SemaphoreSlim _concurrencyLimiter = new(5, 5);
     private static readonly ConcurrentDictionary<string, (DateTime WindowStart, int Count)> _ipTracker = new();
@@ -14,18 +15,25 @@ public class DownloadService
     private static readonly TimeSpan DownloadRateWindow = TimeSpan.FromMinutes(5);
     private const long MinimumFreeDiskSpaceBytes = 2_500_000_000L;
 
-    public DownloadService(IWebHostEnvironment environment)
+    public DownloadService(IWebHostEnvironment environment, ILogger<DownloadService> logger)
     {
         _environment = environment;
+        _logger = logger;
     }
 
     public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string ip = "unknown", CancellationToken cancellationToken = default, string? cookiesBrowser = null, string? cookiesFilePath = null)
     {
         if (!IsValidUrl(url))
+        {
+            _logger.LogWarning("Blocked invalid URL from {Ip}: {Url}", ip, url);
             return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
+        }
 
         if (IsIpRateLimited(ip))
+        {
+            _logger.LogWarning("Rate limit reached for IP {Ip}", ip);
             return DownloadResult.Failed("Zu viele Anfragen. Bitte warte einige Minuten und versuche es erneut.");
+        }
 
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
@@ -43,12 +51,15 @@ public class DownloadService
             return DownloadResult.Failed($"Cookies-Datei nicht gefunden: {cookiesFilePath}");
 
         if (!await _concurrencyLimiter.WaitAsync(TimeSpan.FromSeconds(10)))
+        {
+            _logger.LogWarning("Concurrency limit reached, rejecting request from {Ip}", ip);
             return DownloadResult.Failed("Der Server ist gerade ausgelastet. Bitte kurz warten und es erneut versuchen.");
+        }
 
         var outputLines = new List<string>();
         var sync = new object();
 
-        var process = new Process();
+        using var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
 
         if (!string.IsNullOrWhiteSpace(cookiesFilePath))
@@ -95,9 +106,12 @@ public class DownloadService
 
         if (!process.Start())
         {
+            _logger.LogError("Failed to start yt-dlp for {Url}", url);
             _concurrencyLimiter.Release();
             return DownloadResult.Failed("yt-dlp konnte nicht gestartet werden.");
         }
+
+        _logger.LogInformation("Download started for {Url} [{Format}] from {Ip}", url, format, ip);
 
         async Task ConsumeStreamAsync(StreamReader reader, CancellationToken token)
         {
@@ -147,9 +161,13 @@ public class DownloadService
         catch (OperationCanceledException)
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
-            return cancellationToken.IsCancellationRequested
-                ? DownloadResult.Failed("Download wurde abgebrochen.")
-                : DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
+            if (cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Download cancelled by user from {Ip}", ip);
+                return DownloadResult.Failed("Download wurde abgebrochen.");
+            }
+            _logger.LogWarning("Download timed out for {Url} from {Ip}", url, ip);
+            return DownloadResult.Failed("Download-Timeout: yt-dlp hat nach 10 Minuten nicht geantwortet.");
         }
         finally
         {
@@ -167,6 +185,7 @@ public class DownloadService
         if (process.ExitCode != 0)
         {
             var errorText = string.Join(" ", RelevantLines(outputLines));
+            _logger.LogWarning("yt-dlp exited with code {Code} for {Url}: {Error}", process.ExitCode, url, errorText);
             return DownloadResult.Failed(TranslateError(errorText));
         }
 
@@ -183,6 +202,7 @@ public class DownloadService
         }
 
         await onProgress(100);
+        _logger.LogInformation("Download succeeded for {Url} — {Count} file(s) from {Ip}", url, newFiles.Count, ip);
         return DownloadResult.Succeeded(downloadPath, newFiles, false);
     }
 
@@ -190,7 +210,7 @@ public class DownloadService
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-        var process = new Process();
+        using var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
         process.StartInfo.Arguments = "--update-to nightly";
         process.StartInfo.RedirectStandardOutput = true;

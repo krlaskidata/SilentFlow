@@ -7,135 +7,28 @@
 <PageTitle>SilentFlow</PageTitle>
 
 <div class="main">
-    <div class="container">
+    <DownloadContainer ClientIp="@_clientIp" Placeholder="YouTube, Instagram, Facebook, TikTok URL..." @ref="_container1" />
+    <DownloadContainer ClientIp="@_clientIp" Placeholder="Externen URL eingeben..." @ref="_container2" />
 
-        <form @onsubmit="StartDownload" @onsubmit:preventDefault="true">
-            <input @bind="url" @bind:event="oninput" placeholder="YouTube, Instagram, Facebook, TikTok URL..." />
-
-            <select @bind="format">
-                <option value="mp4">MP4</option>
-                <option value="mp3">MP3</option>
-            </select>
-
-            <button type="submit" disabled="@isRunning">
-                @(isRunning ? "Converting..." : "Convert")
-            </button>
-        </form>
-
-        <div class="progress-container">
-            <div class="progress-bar" style="width: @(progress)%">@(progress)%</div>
-        </div>
-
-        @if (!string.IsNullOrEmpty(result) || downloadedFiles.Count > 0)
+    <div class="update-bar">
+        <button class="btn-update" @onclick="ResetAll">Zurücksetzen</button>
+        <button class="btn-update" @onclick="UpdateYtDlp" disabled="@isUpdating">
+            @(isUpdating ? "Aktualisiert..." : "yt-dlp aktualisieren")
+        </button>
+        @if (!string.IsNullOrEmpty(updateMessage))
         {
-            <div class="result">
-                @if (!string.IsNullOrEmpty(result))
-                {
-                    <span>@result</span>
-                }
-                @foreach (var file in downloadedFiles)
-                {
-                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
-                }
-            </div>
+            <span class="update-msg">@updateMessage</span>
         }
-
-        @if (!string.IsNullOrEmpty(error))
-        {
-            <div class="error">@error</div>
-        }
-
-        <div class="update-bar">
-            <button class="btn-update" @onclick="ResetAll">
-                Zurücksetzen
-            </button>
-            <button class="btn-update" @onclick="UpdateYtDlp" disabled="@isUpdating">
-                @(isUpdating ? "Aktualisiert..." : "yt-dlp aktualisieren")
-            </button>
-            @if (!string.IsNullOrEmpty(updateMessage))
-            {
-                <span class="update-msg">@updateMessage</span>
-            }
-        </div>
-
-        <div class="info-bar">
-            <span class="disclaimer">Nur für Inhalte verwenden, die du herunterladen darfst.</span>
-            <a class="author-link" href="https://github.com/krlaskidata" target="_blank">Laura B. Kraft</a>
-        </div>
-
-    </div>
-
-    <div class="container">
-
-        <form @onsubmit="StartDownload2" @onsubmit:preventDefault="true">
-            <input @bind="url2" @bind:event="oninput" placeholder="Externen URL eingeben..." />
-
-            <select @bind="format2">
-                <option value="mp4">MP4</option>
-                <option value="mp3">MP3</option>
-            </select>
-
-            <button type="submit" disabled="@isRunning2">
-                @(isRunning2 ? "Converting..." : "Convert")
-            </button>
-        </form>
-
-        <div class="progress-container">
-            <div class="progress-bar" style="width: @(progress2)%">@(progress2)%</div>
-        </div>
-
-        @if (!string.IsNullOrEmpty(result2) || downloadedFiles2.Count > 0)
-        {
-            <div class="result">
-                @if (!string.IsNullOrEmpty(result2))
-                {
-                    <span>@result2</span>
-                }
-                @foreach (var file in downloadedFiles2)
-                {
-                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
-                }
-            </div>
-        }
-
-        @if (!string.IsNullOrEmpty(error2))
-        {
-            <div class="error">@error2</div>
-        }
-
-        <div class="info-bar">
-            <span class="disclaimer">Nur für Inhalte verwenden, die du herunterladen darfst.</span>
-            <a class="author-link" href="https://github.com/krlaskidata" target="_blank">Laura B. Kraft</a>
-        </div>
-
     </div>
 </div>
 
 @code {
     private string _clientIp = "unknown";
-
     private bool isUpdating;
     private string updateMessage = string.Empty;
 
-    private string url = string.Empty;
-    private string format = "mp4";
-    private int progress;
-    private string result = string.Empty;
-    private string error = string.Empty;
-    private bool isRunning;
-    private List<string> downloadedFiles = [];
-    private CancellationTokenSource? _progressCts;
-    private CancellationTokenSource? _downloadCts;
-
-    private string url2 = string.Empty;
-    private string format2 = "mp4";
-    private int progress2;
-    private string result2 = string.Empty;
-    private string error2 = string.Empty;
-    private bool isRunning2;
-    private List<string> downloadedFiles2 = [];
-    private CancellationTokenSource? _progressCts2;
-    private CancellationTokenSource? _downloadCts2;
+    private DownloadContainer _container1 = default!;
+    private DownloadContainer _container2 = default!;
 
     protected override void OnInitialized()
     {
@@ -157,190 +50,9 @@
 
     private async Task ResetAll()
     {
-        if (_downloadCts is not null) await _downloadCts.CancelAsync();
-        if (_downloadCts2 is not null) await _downloadCts2.CancelAsync();
-        if (_progressCts is not null) await _progressCts.CancelAsync();
-        if (_progressCts2 is not null) await _progressCts2.CancelAsync();
-
-        url = string.Empty;
-        format = "mp4";
-        progress = 0;
-        result = string.Empty;
-        error = string.Empty;
-        isRunning = false;
-        downloadedFiles = [];
-
-        url2 = string.Empty;
-        format2 = "mp4";
-        progress2 = 0;
-        result2 = string.Empty;
-        error2 = string.Empty;
-        isRunning2 = false;
-        downloadedFiles2 = [];
-
+        await Task.WhenAll(_container1.ResetAsync(), _container2.ResetAsync());
+        updateMessage = string.Empty;
         await InvokeAsync(StateHasChanged);
     }
-
-    private async Task StartDownload()
-    {
-        if (isRunning) return;
-        if (string.IsNullOrWhiteSpace(url))
-        {
-            error = "Bitte URL eingeben!";
-            return;
-        }
-
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) ||
-            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
-        {
-            error = "Bitte eine gültige HTTP/HTTPS-URL eingeben.";
-            return;
-        }
-
-        if (format != "mp3" && format != "mp4")
-        {
-            error = "Ungültiges Format.";
-            return;
-        }
-
-        isRunning = true;
-        progress = 0;
-        result = string.Empty;
-        error = string.Empty;
-
-        _downloadCts = new CancellationTokenSource();
-        _progressCts = new CancellationTokenSource();
-        _ = AnimateProgress(_progressCts.Token);
-
-        try
-        {
-            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask, _clientIp, _downloadCts.Token);
-
-            if (!downloadResult.Success)
-            {
-                progress = 0;
-                error = string.IsNullOrWhiteSpace(downloadResult.Message)
-                    ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
-                    : downloadResult.Message;
-            }
-            else
-            {
-                progress = 100;
-                if (downloadResult.AlreadyExisted)
-                {
-                    result = "✅ Already downloaded.";
-                }
-                else
-                {
-                    result = "✅ Download complete!";
-                    downloadedFiles = [.. downloadResult.FileNames];
-                }
-            }
-        }
-        finally
-        {
-            await _progressCts.CancelAsync();
-            isRunning = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task AnimateProgress(CancellationToken token)
-    {
-        var start = DateTime.UtcNow;
-        const double totalSeconds = 8.0;
-
-        while (!token.IsCancellationRequested)
-        {
-            var t = Math.Min((DateTime.UtcNow - start).TotalSeconds / totalSeconds, 1.0);
-            var eased = 1.0 - Math.Pow(1.0 - t, 2.0);
-            progress = Math.Max(1, (int)(eased * 88));
-            await InvokeAsync(StateHasChanged);
-
-            try { await Task.Delay(80, token); }
-            catch (OperationCanceledException) { break; }
-        }
-    }
-
-    private async Task StartDownload2()
-    {
-        if (isRunning2) return;
-
-        if (string.IsNullOrWhiteSpace(url2))
-        {
-            error2 = "Bitte URL eingeben!";
-            return;
-        }
-
-        if (!Uri.TryCreate(url2, UriKind.Absolute, out var parsed) ||
-            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
-        {
-            error2 = "Bitte eine gültige HTTP/HTTPS-URL eingeben.";
-            return;
-        }
-
-        if (format2 != "mp3" && format2 != "mp4")
-        {
-            error2 = "Ungültiges Format.";
-            return;
-        }
-
-        isRunning2 = true;
-        progress2 = 0;
-        result2 = string.Empty;
-        error2 = string.Empty;
-
-        _downloadCts2 = new CancellationTokenSource();
-        _progressCts2 = new CancellationTokenSource();
-        _ = AnimateProgress2(_progressCts2.Token);
-
-        try
-        {
-            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, _clientIp, _downloadCts2.Token);
-
-            if (!downloadResult.Success)
-            {
-                progress2 = 0;
-                error2 = string.IsNullOrWhiteSpace(downloadResult.Message)
-                    ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
-                    : downloadResult.Message;
-            }
-            else
-            {
-                progress2 = 100;
-                if (downloadResult.AlreadyExisted)
-                {
-                    result2 = "✅ Already downloaded.";
-                }
-                else
-                {
-                    result2 = "✅ Download complete!";
-                    downloadedFiles2 = [.. downloadResult.FileNames];
-                }
-            }
-        }
-        finally
-        {
-            await _progressCts2.CancelAsync();
-            isRunning2 = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task AnimateProgress2(CancellationToken token)
-    {
-        var start = DateTime.UtcNow;
-        const double totalSeconds = 8.0;
-
-        while (!token.IsCancellationRequested)
-        {
-            var t = Math.Min((DateTime.UtcNow - start).TotalSeconds / totalSeconds, 1.0);
-            var eased = 1.0 - Math.Pow(1.0 - t, 2.0);
-            progress2 = Math.Max(1, (int)(eased * 88));
-            await InvokeAsync(StateHasChanged);
-
-            try { await Task.Delay(80, token); }
-            catch (OperationCanceledException) { break; }
-        }
-    }
 }
+

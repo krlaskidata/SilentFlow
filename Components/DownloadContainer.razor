@@ -1,0 +1,167 @@
+@inject DownloadService DownloadService
+
+<div class="container">
+
+    <form @onsubmit="StartDownload" @onsubmit:preventDefault="true">
+        <input @bind="url" @bind:event="oninput" placeholder="@Placeholder" />
+
+        <select @bind="format">
+            <option value="mp4">MP4</option>
+            <option value="mp3">MP3</option>
+        </select>
+
+        <button type="submit" disabled="@isRunning">
+            @(isRunning ? "Lädt..." : "Starten")
+        </button>
+
+        @if (isRunning)
+        {
+            <button type="button" class="btn-update" @onclick="CancelDownload">
+                Abbrechen
+            </button>
+        }
+    </form>
+
+    <div class="progress-container">
+        <div class="progress-bar" style="width: @(progress)%">@(progress)%</div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusHint))
+    {
+        <div class="status-hint">@statusHint</div>
+    }
+
+    @if (!string.IsNullOrEmpty(result) || downloadedFiles.Count > 0)
+    {
+        <div class="result">
+            @if (!string.IsNullOrEmpty(result))
+            {
+                <span>@result</span>
+            }
+            @foreach (var file in downloadedFiles)
+            {
+                <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="error">@error</div>
+    }
+
+    <div class="info-bar">
+        <span class="disclaimer">Nur für Inhalte verwenden, die du herunterladen darfst.</span>
+        <a class="author-link" href="https://github.com/krlaskidata" target="_blank" rel="noopener noreferrer">Laura B. Kraft</a>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public string ClientIp { get; set; } = "unknown";
+    [Parameter] public string Placeholder { get; set; } = "URL eingeben...";
+
+    private string url = string.Empty;
+    private string format = "mp4";
+    private int progress;
+    private string statusHint = string.Empty;
+    private string result = string.Empty;
+    private string error = string.Empty;
+    private bool isRunning;
+    private List<string> downloadedFiles = [];
+    private CancellationTokenSource? _downloadCts;
+
+    public async Task ResetAsync()
+    {
+        if (_downloadCts is not null) await _downloadCts.CancelAsync();
+
+        url = string.Empty;
+        format = "mp4";
+        progress = 0;
+        statusHint = string.Empty;
+        result = string.Empty;
+        error = string.Empty;
+        isRunning = false;
+        downloadedFiles = [];
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CancelDownload()
+    {
+        if (_downloadCts is not null)
+            await _downloadCts.CancelAsync();
+    }
+
+    private async Task StartDownload()
+    {
+        if (isRunning) return;
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            error = "Bitte URL eingeben.";
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) ||
+            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            error = "Bitte eine gültige HTTP/HTTPS-URL eingeben.";
+            return;
+        }
+
+        if (format != "mp3" && format != "mp4")
+        {
+            error = "Ungültiges Format.";
+            return;
+        }
+
+        isRunning = true;
+        progress = 1;
+        statusHint = string.Empty;
+        result = string.Empty;
+        error = string.Empty;
+
+        _downloadCts = new CancellationTokenSource();
+
+        try
+        {
+            var downloadResult = await DownloadService.RunDownloadAsync(
+                url,
+                format,
+                async pct =>
+                {
+                    progress = pct;
+                    statusHint = pct >= 100 ? "Verarbeite..." : string.Empty;
+                    await InvokeAsync(StateHasChanged);
+                },
+                ClientIp,
+                _downloadCts.Token);
+
+            if (!downloadResult.Success)
+            {
+                progress = 0;
+                statusHint = string.Empty;
+                error = string.IsNullOrWhiteSpace(downloadResult.Message)
+                    ? "Download fehlgeschlagen. Bitte URL und Format überprüfen."
+                    : downloadResult.Message;
+            }
+            else
+            {
+                progress = 100;
+                statusHint = string.Empty;
+                result = downloadResult.AlreadyExisted
+                    ? "✅ Bereits heruntergeladen."
+                    : "✅ Download abgeschlossen!";
+
+                if (!downloadResult.AlreadyExisted)
+                    downloadedFiles = [.. downloadResult.FileNames];
+            }
+        }
+        finally
+        {
+            isRunning = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

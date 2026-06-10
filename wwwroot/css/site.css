@@ -162,6 +162,13 @@ form button[type="submit"]:disabled {
   word-break: break-word;
 }
 
+.status-hint {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: #7b2fbe;
+  font-style: italic;
+}
+
 /* === Update bar === */
 
 .update-bar {
