@@ -221,6 +221,9 @@ public class DownloadService
 
     private static bool IsValidUrl(string url)
     {
+        if (string.IsNullOrWhiteSpace(url) || url.Length > 2048)
+            return false;
+
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return false;
 
@@ -242,11 +245,13 @@ public class DownloadService
                 if (bytes[0] == 10) return false;
                 if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return false;
                 if (bytes[0] == 192 && bytes[1] == 168) return false;
+                if (bytes[0] == 169 && bytes[1] == 254) return false;
             }
 
             if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
                 if (ip.Equals(IPAddress.IPv6Loopback)) return false;
+                if (ip.IsIPv6LinkLocal) return false;
             }
         }
 
