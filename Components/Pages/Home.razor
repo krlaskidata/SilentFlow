@@ -183,6 +183,7 @@
 
     private async Task StartDownload()
     {
+        if (isRunning) return;
         if (string.IsNullOrWhiteSpace(url))
         {
             error = "Bitte URL eingeben!";
@@ -263,6 +264,8 @@
 
     private async Task StartDownload2()
     {
+        if (isRunning2) return;
+
         if (string.IsNullOrWhiteSpace(url2))
         {
             error2 = "Bitte URL eingeben!";
