@@ -149,7 +149,11 @@ public class DownloadService
         }
 
         var filesAfter = Directory.GetFiles(downloadPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var newFilesCount = filesAfter.Except(filesBefore).Count();
+        var newFiles = filesAfter.Except(filesBefore)
+            .Select(Path.GetFileName)
+            .Where(f => !string.IsNullOrEmpty(f))
+            .Cast<string>()
+            .ToList();
         var alreadyDownloaded = outputLines.Any(l => l.Contains("already been downloaded", StringComparison.OrdinalIgnoreCase));
 
         if (process.ExitCode != 0)
@@ -161,17 +165,17 @@ public class DownloadService
         if (alreadyDownloaded)
         {
             await onProgress(100);
-            return DownloadResult.Succeeded(downloadPath, 0, true);
+            return DownloadResult.Succeeded(downloadPath, [], true);
         }
 
-        if (newFilesCount == 0)
+        if (newFiles.Count == 0)
         {
             var message = string.Join(Environment.NewLine, RelevantLines(outputLines));
             return DownloadResult.Failed($"Kein Download gespeichert.{Environment.NewLine}{message}");
         }
 
         await onProgress(100);
-        return DownloadResult.Succeeded(downloadPath, newFilesCount, false);
+        return DownloadResult.Succeeded(downloadPath, newFiles, false);
     }
 
     public async Task<string> UpdateYtDlpAsync()
@@ -296,12 +300,12 @@ public class DownloadService
     }
 }
 
-public record DownloadResult(bool Success, string Message, string DownloadDirectory, int FilesCreated, bool AlreadyExisted)
+public record DownloadResult(bool Success, string Message, string DownloadDirectory, int FilesCreated, bool AlreadyExisted, IReadOnlyList<string> FileNames)
 {
-    public static DownloadResult Succeeded(string downloadDirectory, int filesCreated, bool alreadyExisted) =>
-        new(true, string.Empty, downloadDirectory, filesCreated, alreadyExisted);
+    public static DownloadResult Succeeded(string downloadDirectory, IReadOnlyList<string> fileNames, bool alreadyExisted) =>
+        new(true, string.Empty, downloadDirectory, fileNames.Count, alreadyExisted, fileNames);
 
     public static DownloadResult Failed(string message) =>
-        new(false, message, string.Empty, 0, false);
+        new(false, message, string.Empty, 0, false, []);
 }
 

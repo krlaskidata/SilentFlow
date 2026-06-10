@@ -25,9 +25,18 @@
             <div class="progress-bar" style="width: @(progress)%">@(progress)%</div>
         </div>
 
-        @if (!string.IsNullOrEmpty(result))
+        @if (!string.IsNullOrEmpty(result) || downloadedFiles.Count > 0)
         {
-            <div class="result">@result</div>
+            <div class="result">
+                @if (!string.IsNullOrEmpty(result))
+                {
+                    <span>@result</span>
+                }
+                @foreach (var file in downloadedFiles)
+                {
+                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
+                }
+            </div>
         }
 
         @if (!string.IsNullOrEmpty(error))
@@ -67,9 +76,18 @@
             <div class="progress-bar" style="width: @(progress2)%">@(progress2)%</div>
         </div>
 
-        @if (!string.IsNullOrEmpty(result2))
+        @if (!string.IsNullOrEmpty(result2) || downloadedFiles2.Count > 0)
         {
-            <div class="result">@result2</div>
+            <div class="result">
+                @if (!string.IsNullOrEmpty(result2))
+                {
+                    <span>@result2</span>
+                }
+                @foreach (var file in downloadedFiles2)
+                {
+                    <a class="download-link" href="/download/@Uri.EscapeDataString(file)" download="@file">⬇ @file</a>
+                }
+            </div>
         }
 
         @if (!string.IsNullOrEmpty(error2))
@@ -94,6 +112,7 @@
     private string result = string.Empty;
     private string error = string.Empty;
     private bool isRunning;
+    private List<string> downloadedFiles = [];
     private CancellationTokenSource? _progressCts;
 
     private string url2 = string.Empty;
@@ -102,6 +121,7 @@
     private string result2 = string.Empty;
     private string error2 = string.Empty;
     private bool isRunning2;
+    private List<string> downloadedFiles2 = [];
     private CancellationTokenSource? _progressCts2;
 
     protected override void OnInitialized()
@@ -122,6 +142,7 @@
         result = string.Empty;
         error = string.Empty;
         isRunning = false;
+        downloadedFiles = [];
 
         url2 = string.Empty;
         format2 = "mp4";
@@ -129,6 +150,7 @@
         result2 = string.Empty;
         error2 = string.Empty;
         isRunning2 = false;
+        downloadedFiles2 = [];
 
         await InvokeAsync(StateHasChanged);
     }
@@ -176,9 +198,15 @@
             else
             {
                 progress = 100;
-                result = downloadResult.AlreadyExisted
-                    ? "✅ Already downloaded."
-                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+                if (downloadResult.AlreadyExisted)
+                {
+                    result = "✅ Already downloaded.";
+                }
+                else
+                {
+                    result = "✅ Download complete!";
+                    downloadedFiles = [.. downloadResult.FileNames];
+                }
             }
         }
         finally
@@ -249,9 +277,15 @@
             else
             {
                 progress2 = 100;
-                result2 = downloadResult.AlreadyExisted
-                    ? "✅ Already downloaded."
-                    : $"✅ Download complete! {downloadResult.FilesCreated} file(s) saved.";
+                if (downloadResult.AlreadyExisted)
+                {
+                    result2 = "✅ Already downloaded.";
+                }
+                else
+                {
+                    result2 = "✅ Download complete!";
+                    downloadedFiles2 = [.. downloadResult.FileNames];
+                }
             }
         }
         finally

@@ -43,4 +43,27 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+app.MapGet("/download/{filename}", (string filename, IWebHostEnvironment env) =>
+{
+    var safeName = Path.GetFileName(filename);
+    if (string.IsNullOrEmpty(safeName) || safeName != filename)
+        return Results.BadRequest();
+
+    var filePath = Path.Combine(env.ContentRootPath, "downloads", safeName);
+    if (!File.Exists(filePath))
+        return Results.NotFound();
+
+    var contentType = Path.GetExtension(safeName).ToLowerInvariant() switch
+    {
+        ".mp3" => "audio/mpeg",
+        ".mp4" => "video/mp4",
+        ".webm" => "video/webm",
+        ".m4a" => "audio/mp4",
+        ".opus" => "audio/ogg",
+        _ => "application/octet-stream"
+    };
+
+    return Results.File(filePath, contentType, safeName, enableRangeProcessing: true);
+});
+
 app.Run();
