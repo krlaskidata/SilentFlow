@@ -1,6 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 @inject DownloadService DownloadService
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>SilentFlow</PageTitle>
 
@@ -85,6 +86,8 @@
 </div>
 
 @code {
+    private string _clientIp = "unknown";
+
     private string url = string.Empty;
     private string format = "mp4";
     private int progress;
@@ -100,6 +103,13 @@
     private string error2 = string.Empty;
     private bool isRunning2;
     private CancellationTokenSource? _progressCts2;
+
+    protected override void OnInitialized()
+    {
+        var ip = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        if (!string.IsNullOrEmpty(ip))
+            _clientIp = ip;
+    }
 
     private async Task ResetAll()
     {
@@ -154,7 +164,7 @@
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask);
+            var downloadResult = await DownloadService.RunDownloadAsync(url, format, _ => Task.CompletedTask, _clientIp);
 
             if (!downloadResult.Success)
             {
@@ -227,7 +237,7 @@
 
         try
         {
-            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask);
+            var downloadResult = await DownloadService.RunDownloadAsync(url2, format2, _ => Task.CompletedTask, _clientIp);
 
             if (!downloadResult.Success)
             {

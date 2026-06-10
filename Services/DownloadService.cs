@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -8,16 +9,22 @@ public class DownloadService
     private readonly IWebHostEnvironment _environment;
     private static readonly Regex ProgressRegex = new(@"\[download\]\s+(\d{1,3}(?:\.\d+)?)%", RegexOptions.Compiled);
     private static readonly SemaphoreSlim _concurrencyLimiter = new(5, 5);
+    private static readonly ConcurrentDictionary<string, (DateTime WindowStart, int Count)> _ipTracker = new();
+    private const int DownloadsPerWindow = 5;
+    private static readonly TimeSpan DownloadRateWindow = TimeSpan.FromMinutes(5);
 
     public DownloadService(IWebHostEnvironment environment)
     {
         _environment = environment;
     }
 
-    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string? cookiesBrowser = null, string? cookiesFilePath = null)
+    public async Task<DownloadResult> RunDownloadAsync(string url, string format, Func<int, Task> onProgress, string ip = "unknown", string? cookiesBrowser = null, string? cookiesFilePath = null)
     {
         if (!IsValidUrl(url))
             return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
+
+        if (IsIpRateLimited(ip))
+            return DownloadResult.Failed("Zu viele Anfragen. Bitte warte einige Minuten und versuche es erneut.");
 
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
@@ -218,6 +225,36 @@ public class DownloadService
         lines
             .Where(l => l.StartsWith('[') || l.StartsWith("ERROR:") || l.StartsWith("WARNING:") || l.StartsWith("Merging"))
             .TakeLast(8);
+
+    private static bool IsIpRateLimited(string ip)
+    {
+        if (ip == "unknown") return false;
+
+        var now = DateTime.UtcNow;
+        bool limited = false;
+
+        if (_ipTracker.Count > 500)
+        {
+            foreach (var key in _ipTracker.Keys.ToList())
+            {
+                if (_ipTracker.TryGetValue(key, out var stale) && now - stale.WindowStart > DownloadRateWindow)
+                    _ipTracker.TryRemove(key, out _);
+            }
+        }
+
+        _ipTracker.AddOrUpdate(
+            ip,
+            _ => (now, 1),
+            (_, existing) =>
+            {
+                if (now - existing.WindowStart > DownloadRateWindow)
+                    return (now, 1);
+                limited = existing.Count >= DownloadsPerWindow;
+                return limited ? existing : (existing.WindowStart, existing.Count + 1);
+            });
+
+        return limited;
+    }
 
     private static bool IsValidUrl(string url)
     {
