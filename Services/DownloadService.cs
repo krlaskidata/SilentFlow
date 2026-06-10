@@ -12,6 +12,7 @@ public class DownloadService
     private static readonly ConcurrentDictionary<string, (DateTime WindowStart, int Count)> _ipTracker = new();
     private const int DownloadsPerWindow = 5;
     private static readonly TimeSpan DownloadRateWindow = TimeSpan.FromMinutes(5);
+    private const long MinimumFreeDiskSpaceBytes = 2_500_000_000L;
 
     public DownloadService(IWebHostEnvironment environment)
     {
@@ -28,6 +29,9 @@ public class DownloadService
 
         string downloadPath = Path.Combine(_environment.ContentRootPath, "downloads");
         Directory.CreateDirectory(downloadPath);
+
+        if (!HasSufficientDiskSpace(downloadPath))
+            return DownloadResult.Failed("Nicht genügend Speicherplatz verfügbar. Bitte versuche es später erneut.");
 
         CleanupOldDownloads(downloadPath);
 
@@ -229,6 +233,19 @@ public class DownloadService
         lines
             .Where(l => l.StartsWith('[') || l.StartsWith("ERROR:") || l.StartsWith("WARNING:") || l.StartsWith("Merging"))
             .TakeLast(8);
+
+    private static bool HasSufficientDiskSpace(string path)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(path) ?? path;
+            return new DriveInfo(root).AvailableFreeSpace >= MinimumFreeDiskSpaceBytes;
+        }
+        catch
+        {
+            return true;
+        }
+    }
 
     private static bool IsIpRateLimited(string ip)
     {
