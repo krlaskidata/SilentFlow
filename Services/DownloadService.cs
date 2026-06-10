@@ -165,8 +165,8 @@ public class DownloadService
 
         if (process.ExitCode != 0)
         {
-            var message = string.Join(Environment.NewLine, RelevantLines(outputLines));
-            return DownloadResult.Failed($"yt-dlp Fehler (ExitCode {process.ExitCode}).{Environment.NewLine}{message}");
+            var errorText = string.Join(" ", RelevantLines(outputLines));
+            return DownloadResult.Failed(TranslateError(errorText));
         }
 
         if (alreadyDownloaded)
@@ -236,6 +236,42 @@ public class DownloadService
         lines
             .Where(l => l.StartsWith('[') || l.StartsWith("ERROR:") || l.StartsWith("WARNING:") || l.StartsWith("Merging"))
             .TakeLast(8);
+
+    private static string TranslateError(string raw)
+    {
+        if (raw.Contains("CERTIFICATE_VERIFY_FAILED", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("SSL", StringComparison.OrdinalIgnoreCase))
+            return "SSL-Fehler beim Verbinden. Bitte yt-dlp aktualisieren oder später erneut versuchen.";
+
+        if (raw.Contains("Video unavailable", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("not available", StringComparison.OrdinalIgnoreCase))
+            return "Das Video ist nicht verfügbar oder wurde gelöscht.";
+
+        if (raw.Contains("Private video", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("private", StringComparison.OrdinalIgnoreCase))
+            return "Privates Video — kein Zugriff möglich.";
+
+        if (raw.Contains("Login required", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("Sign in", StringComparison.OrdinalIgnoreCase))
+            return "Anmeldung beim Dienst erforderlich. Cookies werden benötigt.";
+
+        if (raw.Contains("Unsupported URL", StringComparison.OrdinalIgnoreCase))
+            return "Diese URL wird nicht unterstützt.";
+
+        if (raw.Contains("No video formats found", StringComparison.OrdinalIgnoreCase))
+            return "Kein kompatibles Videoformat gefunden.";
+
+        if (raw.Contains("HTTP Error 403", StringComparison.OrdinalIgnoreCase))
+            return "Zugriff verweigert (403). Der Dienst blockiert den Download.";
+
+        if (raw.Contains("HTTP Error 404", StringComparison.OrdinalIgnoreCase))
+            return "Inhalt nicht gefunden (404). Bitte URL überprüfen.";
+
+        if (raw.Contains("already been downloaded", StringComparison.OrdinalIgnoreCase))
+            return "Bereits heruntergeladen.";
+
+        return "Download fehlgeschlagen. Bitte URL überprüfen und erneut versuchen.";
+    }
 
     private static bool HasSufficientDiskSpace(string path)
     {
