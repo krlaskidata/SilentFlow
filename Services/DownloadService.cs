@@ -276,6 +276,9 @@ public class DownloadService
             raw.Contains("Sign in", StringComparison.OrdinalIgnoreCase))
             return "Anmeldung beim Dienst erforderlich. Cookies werden benötigt.";
 
+        if (raw.Contains("Cannot parse data", StringComparison.OrdinalIgnoreCase))
+            return "Facebook/Instagram konnte nicht gelesen werden. Bitte einen Cookies-Browser auswählen (z. B. Edge) und sicherstellen, dass du dort eingeloggt bist.";
+
         if (raw.Contains("Unsupported URL", StringComparison.OrdinalIgnoreCase))
             return "Diese URL wird nicht unterstützt.";
 

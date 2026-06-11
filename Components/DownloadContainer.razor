@@ -10,6 +10,13 @@
             <option value="mp3">MP3</option>
         </select>
 
+        <select @bind="cookiesBrowser" title="Cookies-Browser (für Facebook, Instagram u.ä.)">
+            <option value="none">Keine Cookies</option>
+            <option value="edge">Edge</option>
+            <option value="chrome">Chrome</option>
+            <option value="firefox">Firefox</option>
+        </select>
+
         <button type="submit" disabled="@isRunning">
             @(isRunning ? "Lädt..." : "Starten")
         </button>
@@ -63,6 +70,7 @@
 
     private string url = string.Empty;
     private string format = "mp4";
+    private string cookiesBrowser = "none";
     private int progress;
     private string statusHint = string.Empty;
     private string result = string.Empty;
@@ -77,6 +85,7 @@
 
         url = string.Empty;
         format = "mp4";
+        cookiesBrowser = "none";
         progress = 0;
         statusHint = string.Empty;
         result = string.Empty;
@@ -136,7 +145,8 @@
                     await InvokeAsync(StateHasChanged);
                 },
                 ClientIp,
-                _downloadCts.Token);
+                _downloadCts.Token,
+                cookiesBrowser);
 
             if (!downloadResult.Success)
             {
