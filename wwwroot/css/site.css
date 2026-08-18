@@ -334,14 +334,16 @@ form button[type="submit"]:disabled {
   border-radius: 12px;
   overflow: hidden;
   transition: transform 0.2s, filter 0.2s;
+  padding: 8px;
+  background: rgba(108, 92, 231, 0.1);
+  border: 1px solid rgba(108, 92, 231, 0.25);
 }
 
 .steam-profile-link img {
   display: block;
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 12px;
+  max-width: 540px;
+  height: auto;
+  border-radius: 8px;
 }
 
 .steam-profile-link:hover {
