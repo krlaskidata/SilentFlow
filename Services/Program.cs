@@ -7,6 +7,18 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 
+// Load .env file into environment variables
+if (File.Exists(".env"))
+{
+    foreach (var line in File.ReadAllLines(".env"))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+        var parts = line.Split('=', 2);
+        if (parts.Length == 2)
+            Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration
@@ -98,10 +110,10 @@ app.MapGet("/download/{filename}", (string filename, IWebHostEnvironment env) =>
     return Results.File(filePath, contentType, safeName, enableRangeProcessing: true);
 });
 
-app.MapPost("/login-action", async (HttpContext context, IConfiguration config, IFormCollection form) =>
+app.MapPost("/login-action", async (HttpContext context, IFormCollection form) =>
 {
     var password = form["password"].ToString();
-    var configured = config["Auth:Password"] ?? "";
+    var configured = Environment.GetEnvironmentVariable("PASSWORT") ?? "";
 
     if (string.IsNullOrEmpty(configured) ||
         !CryptographicOperations.FixedTimeEquals(
