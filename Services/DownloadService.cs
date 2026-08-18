@@ -14,6 +14,10 @@ public class DownloadService
     private const int DownloadsPerWindow = 5;
     private static readonly TimeSpan DownloadRateWindow = TimeSpan.FromMinutes(5);
     private const long MinimumFreeDiskSpaceBytes = 2_500_000_000L;
+    private static readonly HashSet<string> AllowedBrowsers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "none", "edge", "chrome", "firefox", "safari", "opera", "brave", "chromium"
+    };
 
     public DownloadService(IWebHostEnvironment environment, ILogger<DownloadService> logger)
     {
@@ -27,6 +31,12 @@ public class DownloadService
         {
             _logger.LogWarning("Blocked invalid URL from {Ip}: {Url}", ip, url);
             return DownloadResult.Failed("Ungültige oder nicht erlaubte URL.");
+        }
+
+        if (!string.IsNullOrEmpty(cookiesBrowser) && !AllowedBrowsers.Contains(cookiesBrowser))
+        {
+            _logger.LogWarning("Blocked invalid cookiesBrowser value from {Ip}: {Browser}", ip, cookiesBrowser);
+            return DownloadResult.Failed("Ungültiger Browser-Wert.");
         }
 
         if (IsIpRateLimited(ip))
@@ -239,7 +249,7 @@ public class DownloadService
         }
     }
 
-    private static void CleanupOldDownloads(string downloadPath)
+    private void CleanupOldDownloads(string downloadPath)
     {
         var cutoff = DateTime.UtcNow.AddHours(-24);
         foreach (var file in Directory.GetFiles(downloadPath))
@@ -249,7 +259,10 @@ public class DownloadService
                 if (File.GetLastWriteTimeUtc(file) < cutoff)
                     File.Delete(file);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete old download file: {File}", file);
+            }
         }
     }
 
@@ -317,13 +330,10 @@ public class DownloadService
         var now = DateTime.UtcNow;
         bool limited = false;
 
-        if (_ipTracker.Count > 500)
+        foreach (var key in _ipTracker.Keys.ToList())
         {
-            foreach (var key in _ipTracker.Keys.ToList())
-            {
-                if (_ipTracker.TryGetValue(key, out var stale) && now - stale.WindowStart > DownloadRateWindow)
-                    _ipTracker.TryRemove(key, out _);
-            }
+            if (_ipTracker.TryGetValue(key, out var stale) && now - stale.WindowStart > DownloadRateWindow)
+                _ipTracker.TryRemove(key, out _);
         }
 
         _ipTracker.AddOrUpdate(

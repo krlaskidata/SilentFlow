@@ -49,6 +49,13 @@ builder.Services.AddRateLimiter(options =>
         limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         limiterOptions.QueueLimit = 0;
     });
+    options.AddFixedWindowLimiter("download", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
@@ -58,6 +65,10 @@ builder.Services.AddRazorComponents()
 builder.Services.AddScoped<DownloadService>();
 
 var app = builder.Build();
+
+var ytDlpPath = Path.Combine(Directory.GetCurrentDirectory(), "yt-dlp.exe");
+if (!File.Exists(ytDlpPath))
+    app.Logger.LogCritical("yt-dlp.exe not found at {Path} — downloads will not work", ytDlpPath);
 
 if (!app.Environment.IsDevelopment())
 {
@@ -93,6 +104,12 @@ app.MapGet("/download/{filename}", (string filename, IWebHostEnvironment env) =>
     if (string.IsNullOrEmpty(safeName) || safeName != filename)
         return Results.BadRequest();
 
+    var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { ".mp3", ".mp4", ".webm", ".m4a", ".opus" };
+    var extension = Path.GetExtension(safeName);
+    if (!allowedExtensions.Contains(extension))
+        return Results.BadRequest();
+
     var filePath = Path.Combine(env.ContentRootPath, "downloads", safeName);
     if (!File.Exists(filePath))
         return Results.NotFound();
@@ -108,7 +125,7 @@ app.MapGet("/download/{filename}", (string filename, IWebHostEnvironment env) =>
     };
 
     return Results.File(filePath, contentType, safeName, enableRangeProcessing: true);
-});
+}).RequireRateLimiting("download");
 
 app.MapPost("/login-action", async (HttpContext context, IFormCollection form) =>
 {
