@@ -1,4 +1,5 @@
 @inject DownloadService DownloadService
+@implements IDisposable
 
 <div class="container">
 
@@ -100,6 +101,11 @@
     {
         if (_downloadCts is not null)
             await _downloadCts.CancelAsync();
+    }
+
+    public void Dispose()
+    {
+        _downloadCts?.Dispose();
     }
 
     private async Task StartDownload()

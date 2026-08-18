@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -140,7 +139,8 @@ public class DownloadService
 
                 lock (sync)
                 {
-                    outputLines.Add(line);
+                    if (outputLines.Count < 500)
+                        outputLines.Add(line);
                 }
 
                 var match = ProgressRegex.Match(line);
@@ -222,7 +222,8 @@ public class DownloadService
 
         using var process = new Process();
         process.StartInfo.FileName = "yt-dlp.exe";
-        process.StartInfo.Arguments = "--update-to nightly";
+        process.StartInfo.ArgumentList.Add("--update-to");
+        process.StartInfo.ArgumentList.Add("nightly");
         process.StartInfo.RedirectStandardOutput = true;
         process.StartInfo.RedirectStandardError = true;
         process.StartInfo.UseShellExecute = false;

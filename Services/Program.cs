@@ -32,7 +32,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         options.LoginPath = "/login";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Strict;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
@@ -62,7 +62,7 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddScoped<DownloadService>();
+builder.Services.AddSingleton<DownloadService>();
 
 var app = builder.Build();
 
@@ -125,7 +125,7 @@ app.MapGet("/download/{filename}", (string filename, IWebHostEnvironment env) =>
     };
 
     return Results.File(filePath, contentType, safeName, enableRangeProcessing: true);
-}).RequireRateLimiting("download");
+}).RequireRateLimiting("download").RequireAuthorization();
 
 app.MapPost("/login-action", async (HttpContext context, IFormCollection form) =>
 {
@@ -146,7 +146,7 @@ app.MapPost("/login-action", async (HttpContext context, IFormCollection form) =
     return Results.Redirect("/");
 });
 
-app.MapGet("/logout", async (HttpContext context) =>
+app.MapPost("/logout", async (HttpContext context) =>
 {
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.Redirect("/login");
