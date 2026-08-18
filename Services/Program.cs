@@ -127,7 +127,7 @@ app.MapPost("/login-action", async (HttpContext context, IFormCollection form) =
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     await context.SignInAsync(new ClaimsPrincipal(identity));
     return Results.Redirect("/");
-}).DisableAntiforgery();
+});
 
 app.MapGet("/logout", async (HttpContext context) =>
 {

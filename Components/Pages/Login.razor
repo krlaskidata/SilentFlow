@@ -8,6 +8,7 @@
         <div class="login-title">SilentFlow</div>
 
         <form method="post" action="/login-action">
+            <AntiforgeryToken />
             <input type="password" name="password" placeholder="Passwort..." autofocus />
             <button type="submit">Anmelden</button>
         </form>
