@@ -326,6 +326,29 @@ form button[type="submit"]:disabled {
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* === Steam Profile Link === */
+
+.steam-profile-link {
+  margin-top: 20px;
+  display: inline-block;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.steam-profile-link img {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.steam-profile-link:hover {
+  transform: scale(1.08);
+  filter: brightness(1.15);
+}
+
 /* === Responsive === */
 
 @media (max-width: 520px) {
