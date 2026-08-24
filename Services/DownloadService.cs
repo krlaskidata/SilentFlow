@@ -68,8 +68,10 @@ public class DownloadService
         var outputLines = new List<string>();
         var sync = new object();
 
+        var ytDlpBinary = OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp";
+
         using var process = new Process();
-        process.StartInfo.FileName = "yt-dlp.exe";
+        process.StartInfo.FileName = Path.Combine(_environment.ContentRootPath, ytDlpBinary);
 
         if (!string.IsNullOrWhiteSpace(cookiesFilePath))
         {

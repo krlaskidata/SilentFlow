@@ -1,0 +1,10 @@
+bin/
+obj/
+downloads/
+.env
+.env.*
+*.user
+.git/
+.gitignore
+README.md
+LICENSE

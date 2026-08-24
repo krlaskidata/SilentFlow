@@ -1,0 +1,47 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "letsencrypt:/letsencrypt"
+    restart: unless-stopped
+
+  silentflow:
+    build: .
+    container_name: silentflow
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    volumes:
+      - downloads:/app/downloads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.silentflow.rule=Host(`silent-flow.at`) || Host(`www.silent-flow.at`)"
+      - "traefik.http.routers.silentflow.entrypoints=websecure"
+      - "traefik.http.routers.silentflow.tls.certresolver=letsencrypt"
+      - "traefik.http.services.silentflow.loadbalancer.server.port=8080"
+      - "traefik.http.routers.silentflow-http.rule=Host(`silent-flow.at`) || Host(`www.silent-flow.at`)"
+      - "traefik.http.routers.silentflow-http.entrypoints=web"
+      - "traefik.http.routers.silentflow-http.middlewares=https-redirect"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+    restart: unless-stopped
+    depends_on:
+      - traefik
+
+volumes:
+  letsencrypt:
+  downloads:

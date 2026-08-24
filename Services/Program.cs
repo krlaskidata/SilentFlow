@@ -66,9 +66,10 @@ builder.Services.AddSingleton<DownloadService>();
 
 var app = builder.Build();
 
-var ytDlpPath = Path.Combine(Directory.GetCurrentDirectory(), "yt-dlp.exe");
+var ytDlpBinary = OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp";
+var ytDlpPath = Path.Combine(Directory.GetCurrentDirectory(), ytDlpBinary);
 if (!File.Exists(ytDlpPath))
-    app.Logger.LogCritical("yt-dlp.exe not found at {Path} — downloads will not work", ytDlpPath);
+    app.Logger.LogCritical("{Binary} not found at {Path} — downloads will not work", ytDlpBinary, ytDlpPath);
 
 if (!app.Environment.IsDevelopment())
 {
