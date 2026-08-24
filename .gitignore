@@ -6,9 +6,6 @@ downloads/
 .env.local
 .env.*.local
 
-# Production config (contains domain names)
-Properties/appsettings.Production.json
-
 # Third-party frontend libraries
 wwwroot/lib/
 
